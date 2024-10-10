@@ -1,14 +1,9 @@
 package com.typesafe.config.impl;
 
+import com.typesafe.config.*;
+
 import java.util.Collection;
 import java.util.Collections;
-
-import com.typesafe.config.ConfigException;
-import com.typesafe.config.ConfigOrigin;
-import com.typesafe.config.ConfigRenderOptions;
-import com.typesafe.config.ConfigResolveOptions;
-import com.typesafe.config.ConfigValue;
-import com.typesafe.config.ConfigValueType;
 
 /**
  * ConfigReference replaces ConfigReference (the older class kept for back
@@ -72,23 +67,23 @@ final class ConfigReference extends AbstractConfigValue implements Unmergeable {
         AbstractConfigValue v;
         try {
             ResolveSource.ResultWithPath resultWithPath = source.lookupSubst(newContext, expr, prefixLength);
-            newContext = resultWithPath.result.context;
+            newContext = resultWithPath.result().context();
 
-            if (resultWithPath.result.value != null) {
+            if (resultWithPath.result().value() != null) {
                 if (ConfigImpl.traceSubstitutionsEnabled())
                     ConfigImpl.trace(newContext.depth(), "recursively resolving " + resultWithPath
                             + " which was the resolution of " + expr + " against " + source);
 
                 ResolveSource recursiveResolveSource = (new ResolveSource(
-                        (AbstractConfigObject) resultWithPath.pathFromRoot.last(), resultWithPath.pathFromRoot));
+                        (AbstractConfigObject) resultWithPath.pathFromRoot().last(), resultWithPath.pathFromRoot()));
 
                 if (ConfigImpl.traceSubstitutionsEnabled())
                     ConfigImpl.trace(newContext.depth(), "will recursively resolve against " + recursiveResolveSource);
 
-                ResolveResult<? extends AbstractConfigValue> result = newContext.resolve(resultWithPath.result.value,
+                ResolveResult<? extends AbstractConfigValue> result = newContext.resolve(resultWithPath.result().value(),
                         recursiveResolveSource);
-                v = result.value;
-                newContext = result.context;
+                v = result.value();
+                newContext = result.context();
             } else {
                 ConfigValue fallback = context.options().getResolver().lookup(expr.path().render());
                 v = (AbstractConfigValue) fallback;

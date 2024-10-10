@@ -7,7 +7,11 @@ import java.util.function.Supplier;
 
 public class SystemOverride {
 
-    /** Runs the specified synchronous (blocking) operation
+    private static final SystemImplementation real = new LiveSystemImplementation();
+    private static final ThreadLocal<SystemImplementation> current = ThreadLocal.withInitial(() -> real);
+
+    /**
+     * Runs the specified synchronous (blocking) operation
      * guaranteeing that all SystemOverride methods return the specified values
      * while the operation is being executed.
      * <p>
@@ -15,13 +19,12 @@ public class SystemOverride {
      * so this method is useful whenever you want to influence the configuration resolution
      * through altering the environment variables (also system properties and standard error stream) programmatically.
      *
-     * @param systemProperties replacement for the system properties
+     * @param systemProperties     replacement for the system properties
      * @param environmentVariables replacement for the environment variables
-     * @param errorStream replacement for the standard error stream
-     *
+     * @param errorStream          replacement for the standard error stream
      * @return T the result of the specified operation
      * @throws RuntimeException in case the specified operation throws
-     * */
+     */
     public static <T> T withSystemOverride(
             Map<String, String> systemProperties,
             Map<String, String> environmentVariables,
@@ -59,7 +62,7 @@ public class SystemOverride {
         return current.get().err();
     }
 
-    private static interface SystemImplementation {
+    private sealed interface SystemImplementation {
         Properties getProperties();
 
         String getProperty(String propertyKey);
@@ -72,7 +75,7 @@ public class SystemOverride {
 
     }
 
-    private static class LiveSystemImplementation implements SystemImplementation {
+    private static final class LiveSystemImplementation implements SystemImplementation {
         public Properties getProperties() {
             return System.getProperties();
         }
@@ -96,17 +99,9 @@ public class SystemOverride {
 
     }
 
-    private static class OverriddenSystemImplementation implements SystemImplementation {
-
-        private final Map<String, String> systemProperties;
-        private final Map<String, String> environmentVariables;
-        private final PrintStream errorStream;
-
-        private OverriddenSystemImplementation(Map<String, String> systemProperties, Map<String, String> environmentVariables, PrintStream errorStream) {
-            this.systemProperties = systemProperties;
-            this.environmentVariables = environmentVariables;
-            this.errorStream = errorStream;
-        }
+    private record OverriddenSystemImplementation(Map<String, String> systemProperties,
+                                                  Map<String, String> environmentVariables,
+                                                  PrintStream errorStream) implements SystemImplementation {
 
         public Properties getProperties() {
             Properties result = new Properties();
@@ -130,9 +125,5 @@ public class SystemOverride {
             return errorStream;
         }
     }
-
-    private static final SystemImplementation real = new LiveSystemImplementation();
-
-    private static final ThreadLocal<SystemImplementation> current = ThreadLocal.withInitial(() -> real);
 
 }

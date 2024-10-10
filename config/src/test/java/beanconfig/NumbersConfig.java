@@ -3,7 +3,6 @@ package beanconfig;
 
 public class NumbersConfig {
 
-
     private int intVal;
     private Integer intObj;
     private long longVal;

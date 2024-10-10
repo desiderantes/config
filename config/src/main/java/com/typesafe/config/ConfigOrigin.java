@@ -1,9 +1,9 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config;
 
-import java.net.URL;
+import java.net.URI;
 import java.util.List;
 
 
@@ -11,7 +11,7 @@ import java.util.List;
  * Represents the origin (such as filename and line number) of a
  * {@link ConfigValue} for use in error messages. Obtain the origin of a value
  * with {@link ConfigValue#origin}. Exceptions may have an origin, see
- * {@link ConfigException#origin}, but be careful because
+ * {@link ConfigException#origin()}, but be careful because
  * <code>ConfigException.origin()</code> may return null.
  *
  * <p>
@@ -34,7 +34,7 @@ public interface ConfigOrigin {
      *
      * @return string describing the origin
      */
-    public String description();
+    String description();
 
     /**
      * Returns a filename describing the origin. This will return null if the
@@ -42,15 +42,15 @@ public interface ConfigOrigin {
      *
      * @return filename of the origin or null
      */
-    public String filename();
+    String filename();
 
     /**
-     * Returns a URL describing the origin. This will return null if the origin
-     * has no meaningful URL.
+     * Returns a URI describing the origin. This will return null if the origin
+     * has no meaningful URI.
      *
-     * @return url of the origin or null
+     * @return uri of the origin or null
      */
-    public URL url();
+    URI uri();
 
     /**
      * Returns a classpath resource name describing the origin. This will return
@@ -58,7 +58,7 @@ public interface ConfigOrigin {
      *
      * @return resource name of the origin or null
      */
-    public String resource();
+    String resource();
 
     /**
      * Returns a line number where the value or exception originated. This will
@@ -66,7 +66,7 @@ public interface ConfigOrigin {
      *
      * @return line number or -1 if none is available
      */
-    public int lineNumber();
+    int lineNumber();
 
     /**
      * Returns any comments that appeared to "go with" this place in the file.
@@ -74,11 +74,11 @@ public interface ConfigOrigin {
      * change, but at the moment comments that are immediately before an array
      * element or object field, with no blank line after the comment, "go with"
      * that element or field.
-     * 
+     *
      * @return any comments that seemed to "go with" this origin, empty list if
-     *         none
+     * none
      */
-    public List<String> comments();
+    List<String> comments();
 
     /**
      * Returns a {@code ConfigOrigin} based on this one, but with the given
@@ -90,12 +90,11 @@ public interface ConfigOrigin {
      * Note that when the given comments are equal to the comments on this object,
      * a new instance may not be created and {@code this} is returned directly.
      *
-     * @since 1.3.0
-     *
      * @param comments the comments used on the returned origin
      * @return the ConfigOrigin with the given comments
+     * @since 1.3.0
      */
-    public ConfigOrigin withComments(List<String> comments);
+    ConfigOrigin withComments(List<String> comments);
 
     /**
      * Returns a {@code ConfigOrigin} based on this one, but with the given
@@ -109,10 +108,9 @@ public interface ConfigOrigin {
      * object, a new instance may not be created and {@code this} is returned
      * directly.
      *
-     * @since 1.3.0
-     *
      * @param lineNumber the new line number
      * @return the created ConfigOrigin
+     * @since 1.3.0
      */
-    public ConfigOrigin withLineNumber(int lineNumber);
+    ConfigOrigin withLineNumber(int lineNumber);
 }

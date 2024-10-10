@@ -1,17 +1,18 @@
 /**
- *   Copyright (C) 2015 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2015 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.parser;
 
 import com.typesafe.config.ConfigOrigin;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A node in the syntax tree for a HOCON or JSON document.
- * 
+ *
  * <p>
  * The root node can be retrieved via {@link ConfigDocument#getRoot()}, and
  * further nodes via manual seek or visitors.
- * 
+ *
  * <p>
  * Because this object is immutable, it is safe to use from multiple threads and
  * there's no need for "defensive copies."
@@ -29,22 +30,22 @@ public interface ConfigNode {
      *
      * @return the original text used to form this node as a String
      */
-    public String render();
+    String render();
 
     /**
      * Accepts a custom visitor for syntax tree traversal and returns the resulting
      * value (if any).
-     * 
+     *
      * @param <T>     Type of the return
      * @param visitor Custom visitor returning T
      * @return Result of calling visitor.visit*(this)
      */
-    public <T> T accept(ConfigNodeVisitor<T> visitor);
+    <T> T accept(ConfigNodeVisitor<T> visitor);
 
     /**
      * Returns the location of the current node in the source file
-     * 
+     *
      * @return origin location
      */
-    public ConfigOrigin origin();
+    @Nullable ConfigOrigin origin();
 }

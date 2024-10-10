@@ -1,12 +1,12 @@
 /**
  * Copyright (C) 2011-2021, Config project contributors
- *   
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
- *         http://www.apache.org/licenses/LICENSE-2.0
- * 
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,7 +17,6 @@
 package com.typesafe.config.parser;
 
 import com.typesafe.config.ConfigParseOptions;
-
 import com.typesafe.config.impl.Parseable;
 
 import java.io.File;
@@ -32,10 +31,8 @@ public final class ConfigDocumentFactory {
     /**
      * Parses a Reader into a ConfigDocument instance.
      *
-     * @param reader
-     *       the reader to parse
-     * @param options
-     *       parse options to control how the reader is interpreted
+     * @param reader  the reader to parse
+     * @param options parse options to control how the reader is interpreted
      * @return the parsed configuration
      * @throws com.typesafe.config.ConfigException on IO or parse errors
      */
@@ -45,11 +42,10 @@ public final class ConfigDocumentFactory {
 
     /**
      * Parses a reader into a Config instance as with
-     * {@link #parseReader(Reader,ConfigParseOptions)} but always uses the
+     * {@link #parseReader(Reader, ConfigParseOptions)} but always uses the
      * default parse options.
      *
-     * @param reader
-     *       the reader to parse
+     * @param reader the reader to parse
      * @return the parsed configuration
      * @throws com.typesafe.config.ConfigException on IO or parse errors
      */
@@ -60,10 +56,8 @@ public final class ConfigDocumentFactory {
     /**
      * Parses a file into a ConfigDocument instance.
      *
-     * @param file
-     *       the file to parse
-     * @param options
-     *       parse options to control how the file is interpreted
+     * @param file    the file to parse
+     * @param options parse options to control how the file is interpreted
      * @return the parsed configuration
      * @throws com.typesafe.config.ConfigException on IO or parse errors
      */
@@ -73,11 +67,10 @@ public final class ConfigDocumentFactory {
 
     /**
      * Parses a file into a ConfigDocument instance as with
-     * {@link #parseFile(File,ConfigParseOptions)} but always uses the
+     * {@link #parseFile(File, ConfigParseOptions)} but always uses the
      * default parse options.
      *
-     * @param file
-     *       the file to parse
+     * @param file the file to parse
      * @return the parsed configuration
      * @throws com.typesafe.config.ConfigException on IO or parse errors
      */
@@ -88,7 +81,7 @@ public final class ConfigDocumentFactory {
     /**
      * Parses a string which should be valid HOCON or JSON.
      *
-     * @param s string to parse
+     * @param s       string to parse
      * @param options parse options
      * @return the parsed configuration
      */

@@ -1,21 +1,18 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
-
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
 
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigOrigin;
 import com.typesafe.config.ConfigSyntax;
+
+import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Internal implementation detail, not ABI stable, do not touch.
@@ -34,7 +31,7 @@ final public class ConfigImplUtil {
     }
 
     static boolean isC0Control(int codepoint) {
-      return (codepoint >= 0x0000 && codepoint <= 0x001F);
+        return (codepoint >= 0x0000 && codepoint <= 0x001F);
     }
 
     public static String renderJsonString(String s) {
@@ -43,32 +40,32 @@ final public class ConfigImplUtil {
         for (int i = 0; i < s.length(); ++i) {
             char c = s.charAt(i);
             switch (c) {
-            case '"':
-                sb.append("\\\"");
-                break;
-            case '\\':
-                sb.append("\\\\");
-                break;
-            case '\n':
-                sb.append("\\n");
-                break;
-            case '\b':
-                sb.append("\\b");
-                break;
-            case '\f':
-                sb.append("\\f");
-                break;
-            case '\r':
-                sb.append("\\r");
-                break;
-            case '\t':
-                sb.append("\\t");
-                break;
-            default:
-                if (isC0Control(c))
-                    sb.append(String.format("\\u%04x", (int) c));
-                else
-                    sb.append(c);
+                case '"':
+                    sb.append("\\\"");
+                    break;
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\b':
+                    sb.append("\\b");
+                    break;
+                case '\f':
+                    sb.append("\\f");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
+                default:
+                    if (isC0Control(c))
+                        sb.append(String.format("\\u%04x", (int) c));
+                    else
+                        sb.append(c);
             }
         }
         sb.append('"');
@@ -78,7 +75,7 @@ final public class ConfigImplUtil {
     static String renderStringUnquotedIfPossible(String s) {
         // this can quote unnecessarily as long as it never fails to quote when
         // necessary
-        if (s.length() == 0)
+        if (s.isEmpty())
             return renderJsonString(s);
 
         // if it starts with a hyphen or number, we have to quote
@@ -102,22 +99,15 @@ final public class ConfigImplUtil {
     }
 
     static boolean isWhitespace(int codepoint) {
-        switch (codepoint) {
-        // try to hit the most common ASCII ones first, then the nonbreaking
-        // spaces that Java brokenly leaves out of isWhitespace.
-        case ' ':
-        case '\n':
-        case '\u00A0':
-        case '\u2007':
-        case '\u202F':
+        return switch (codepoint) {
+            // try to hit the most common ASCII ones first, then the nonbreaking
+            // spaces that Java brokenly leaves out of isWhitespace.
             // this one is the BOM, see
             // http://www.unicode.org/faq/utf_bom.html#BOM
             // we just accept it as a zero-width nonbreaking space.
-        case '\uFEFF':
-            return true;
-        default:
-            return Character.isWhitespace(codepoint);
-        }
+            case ' ', '\n', '\u00A0', '\u2007', '\u202F', '\uFEFF' -> true;
+            default -> Character.isWhitespace(codepoint);
+        };
     }
 
     public static String unicodeTrim(String s) {
@@ -171,10 +161,22 @@ final public class ConfigImplUtil {
 
     public static ConfigException extractInitializerError(ExceptionInInitializerError e) {
         Throwable cause = e.getCause();
-        if (cause != null && cause instanceof ConfigException) {
-            return (ConfigException) cause;
+        if (cause instanceof ConfigException configCause) {
+            return configCause;
         } else {
             throw e;
+        }
+    }
+
+    static File uriToFile(URI uri) {
+        // this isn't really right, clearly, but not sure what to do.
+        try {
+            // this will properly handle hex escapes, etc.
+            return new File(uri);
+        } catch (IllegalArgumentException e) {
+            // file://foo with double slash causes
+            // IllegalArgumentException "url has an authority component"
+            return new File(uri.getPath());
         }
     }
 
@@ -195,7 +197,7 @@ final public class ConfigImplUtil {
     }
 
     public static String joinPath(String... elements) {
-        return (new Path(elements)).render();
+        return (Path.of(elements)).render();
     }
 
     public static String joinPath(List<String> elements) {
@@ -204,7 +206,7 @@ final public class ConfigImplUtil {
 
     public static List<String> splitPath(String path) {
         Path p = Path.newPath(path);
-        List<String> elements = new ArrayList<String>();
+        List<String> elements = new ArrayList<>();
         while (p != null) {
             elements.add(p.first());
             p = p.remainder();
@@ -225,7 +227,7 @@ final public class ConfigImplUtil {
         String[] words = originalName.split("-+");
         StringBuilder nameBuilder = new StringBuilder(originalName.length());
         for (String word : words) {
-            if (nameBuilder.length() == 0) {
+            if (nameBuilder.isEmpty()) {
                 nameBuilder.append(word);
             } else {
                 nameBuilder.append(word.substring(0, 1).toUpperCase());
@@ -244,25 +246,25 @@ final public class ConfigImplUtil {
         // single `_` for convenience; `-` and `_` are less often present in config
         // keys but they have to be representable and the only possible mapping is
         // `_` repeated.
-        switch (num) {
-            case 1: return '.';
-            case 2: return '-';
-            case 3: return '_';
-            default: return 0;
-        }
+        return switch (num) {
+            case 1 -> '.';
+            case 2 -> '-';
+            case 3 -> '_';
+            default -> 0;
+        };
     }
 
     static String envVariableAsProperty(String variable, String prefix) throws ConfigException {
         StringBuilder builder = new StringBuilder();
 
-        String strippedPrefix = variable.substring(prefix.length(), variable.length());
+        String strippedPrefix = variable.substring(prefix.length());
 
         int underscores = 0;
         for (char c : strippedPrefix.toCharArray()) {
             if (c == '_') {
                 underscores++;
             } else {
-                if (underscores > 0  && underscores < 4) {
+                if (underscores > 0 && underscores < 4) {
                     builder.append(underscoreMappings(underscores));
                 } else if (underscores > 3) {
                     throw new ConfigException.BadPath(variable, "Environment variable contains an un-mapped number of underscores.");
@@ -272,7 +274,7 @@ final public class ConfigImplUtil {
             }
         }
 
-        if (underscores > 0  && underscores < 4) {
+        if (underscores > 0 && underscores < 4) {
             builder.append(underscoreMappings(underscores));
         } else if (underscores > 3) {
             throw new ConfigException.BadPath(variable, "Environment variable contains an un-mapped number of underscores.");
@@ -288,15 +290,15 @@ final public class ConfigImplUtil {
      * @return configuration syntax if a match is found. Otherwise, null.
      */
     public static ConfigSyntax syntaxFromExtension(String filename) {
-        if (filename == null)
+        if (filename == null) {
             return null;
-        else if (filename.endsWith(".json"))
+        } else if (filename.endsWith(".json")) {
             return ConfigSyntax.JSON;
-        else if (filename.endsWith(".conf"))
+        } else if (filename.endsWith(".conf")) {
             return ConfigSyntax.CONF;
-        else if (filename.endsWith(".properties"))
+        } else if (filename.endsWith(".properties")) {
             return ConfigSyntax.PROPERTIES;
-        else
+        } else
             return null;
     }
 }

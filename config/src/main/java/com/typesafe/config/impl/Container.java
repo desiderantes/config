@@ -1,5 +1,5 @@
 /**
- *   Copyright (C) 2014 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2014 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
 

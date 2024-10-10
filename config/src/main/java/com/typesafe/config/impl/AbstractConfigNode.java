@@ -1,12 +1,12 @@
 /**
- *   Copyright (C) 2015 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2015 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
 
-import java.util.Collection;
-
 import com.typesafe.config.ConfigOrigin;
 import com.typesafe.config.parser.ConfigNode;
+
+import java.util.Collection;
 
 abstract class AbstractConfigNode implements ConfigNode {
     abstract Collection<Token> tokens();
@@ -32,10 +32,16 @@ abstract class AbstractConfigNode implements ConfigNode {
 
     @Override
     public ConfigOrigin origin() {
+
         Collection<Token> tok = tokens();
-        if (tok.isEmpty())
+        if (tok.isEmpty()) {
             return null;
-        else
-            return tok.iterator().next().origin();
+        } else {
+            if (tok.iterator().next() instanceof TokenWithOrigin tokenWithOrigin) {
+                return tokenWithOrigin.origin();
+            } else {
+                return null;
+            }
+        }
     }
 }

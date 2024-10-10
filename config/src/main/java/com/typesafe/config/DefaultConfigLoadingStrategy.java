@@ -9,6 +9,6 @@ public class DefaultConfigLoadingStrategy implements ConfigLoadingStrategy {
     @Override
     public Config parseApplicationConfig(ConfigParseOptions parseOptions) {
         return ConfigFactory.parseApplicationReplacement(parseOptions)
-            .orElseGet(() -> ConfigFactory.parseResourcesAnySyntax("application", parseOptions));
+                .orElseGet(() -> ConfigFactory.parseResourcesAnySyntax("application", parseOptions));
     }
 }

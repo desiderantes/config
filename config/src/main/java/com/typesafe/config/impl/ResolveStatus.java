@@ -1,5 +1,5 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
 
@@ -11,7 +11,7 @@ import java.util.Collection;
 enum ResolveStatus {
     UNRESOLVED, RESOLVED;
 
-    final static ResolveStatus fromValues(
+    static ResolveStatus fromValues(
             Collection<? extends AbstractConfigValue> values) {
         for (AbstractConfigValue v : values) {
             if (v.resolveStatus() == ResolveStatus.UNRESOLVED)
@@ -20,7 +20,7 @@ enum ResolveStatus {
         return ResolveStatus.RESOLVED;
     }
 
-    final static ResolveStatus fromBoolean(boolean resolved) {
+    static ResolveStatus fromBoolean(boolean resolved) {
         return resolved ? ResolveStatus.RESOLVED : ResolveStatus.UNRESOLVED;
     }
 }

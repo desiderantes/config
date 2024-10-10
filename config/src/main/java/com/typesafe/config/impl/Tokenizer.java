@@ -1,36 +1,18 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
-
-import java.io.IOException;
-import java.io.Reader;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
 
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigOrigin;
 import com.typesafe.config.ConfigSyntax;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Serial;
+import java.util.*;
+
 final class Tokenizer {
-    // this exception should not leave this file
-    private static class ProblemException extends Exception {
-        private static final long serialVersionUID = 1L;
-
-        final private Token problem;
-
-        ProblemException(Token problem) {
-            this.problem = problem;
-        }
-
-        Token problem() {
-            return problem;
-        }
-    }
-
     private static String asString(int codepoint) {
         if (codepoint == '\n')
             return "newline";
@@ -60,91 +42,87 @@ final class Tokenizer {
         return renderedText.toString();
     }
 
-    private static class TokenIterator implements Iterator<Token> {
+    // this exception should not leave this file
+    private static class ProblemException extends Exception {
+        @Serial
+        private static final long serialVersionUID = 1L;
 
-        private static class WhitespaceSaver {
-            // has to be saved inside value concatenations
-            private StringBuilder whitespace;
-            // may need to value-concat with next value
-            private boolean lastTokenWasSimpleValue;
+        final private Token problem;
 
-            WhitespaceSaver() {
-                whitespace = new StringBuilder();
-                lastTokenWasSimpleValue = false;
-            }
-
-            void add(int c) {
-                whitespace.appendCodePoint(c);
-            }
-
-            Token check(Token t, ConfigOrigin baseOrigin, int lineNumber) {
-                if (isSimpleValue(t)) {
-                    return nextIsASimpleValue(baseOrigin, lineNumber);
-                } else {
-                    return nextIsNotASimpleValue(baseOrigin, lineNumber);
-                }
-            }
-
-            // called if the next token is not a simple value;
-            // discards any whitespace we were saving between
-            // simple values.
-            private Token nextIsNotASimpleValue(ConfigOrigin baseOrigin, int lineNumber) {
-                lastTokenWasSimpleValue = false;
-                return createWhitespaceTokenFromSaver(baseOrigin, lineNumber);
-            }
-
-            // called if the next token IS a simple value,
-            // so creates a whitespace token if the previous
-            // token also was.
-            private Token nextIsASimpleValue(ConfigOrigin baseOrigin,
-                    int lineNumber) {
-                Token t = createWhitespaceTokenFromSaver(baseOrigin, lineNumber);
-                if (!lastTokenWasSimpleValue) {
-                    lastTokenWasSimpleValue = true;
-                }
-                return t;
-            }
-
-            private Token createWhitespaceTokenFromSaver(ConfigOrigin baseOrigin,
-                                                         int lineNumber) {
-                if (whitespace.length() > 0) {
-                    Token t;
-                    if (lastTokenWasSimpleValue) {
-                        t = Tokens.newUnquotedText(
-                            lineOrigin(baseOrigin, lineNumber),
-                            whitespace.toString());
-                    } else {
-                        t = Tokens.newIgnoredWhitespace(lineOrigin(baseOrigin, lineNumber),
-                                                        whitespace.toString());
-                    }
-                    whitespace.setLength(0); // reset
-                    return t;
-                }
-                return null;
-            }
+        ProblemException(Token problem) {
+            this.problem = problem;
         }
 
+        Token problem() {
+            return problem;
+        }
+    }
+
+    private static class TokenIterator implements Iterator<Token> {
+
+        // chars JSON allows a number to start with
+        static final String firstNumberChars = "0123456789-";
+        // chars JSON allows to be part of a number
+        static final String numberChars = "0123456789eE+-.";
+        // chars that stop an unquoted string
+        static final String notInUnquotedText = "$\"{}[]:=,+#`^?!@*&\\";
         final private SimpleConfigOrigin origin;
         final private Reader input;
         final private LinkedList<Integer> buffer;
-        private int lineNumber;
-        private ConfigOrigin lineOrigin;
         final private Queue<Token> tokens;
         final private WhitespaceSaver whitespaceSaver;
         final private boolean allowComments;
+        private int lineNumber;
+        private ConfigOrigin lineOrigin;
 
         TokenIterator(ConfigOrigin origin, Reader input, boolean allowComments) {
             this.origin = (SimpleConfigOrigin) origin;
             this.input = input;
             this.allowComments = allowComments;
-            this.buffer = new LinkedList<Integer>();
+            this.buffer = new LinkedList<>();
             lineNumber = 1;
             lineOrigin = this.origin.withLineNumber(lineNumber);
-            tokens = new LinkedList<Token>();
-            tokens.add(Tokens.START);
+            tokens = new LinkedList<>();
+            tokens.add(StaticToken.START);
             whitespaceSaver = new WhitespaceSaver();
         }
 
+        static boolean isWhitespace(int c) {
+            return ConfigImplUtil.isWhitespace(c);
+        }
+
+        static boolean isWhitespaceNotNewline(int c) {
+            return c != '\n' && ConfigImplUtil.isWhitespace(c);
+        }
+
+        private static ProblemException problem(ConfigOrigin origin, String what,
+                                                String message,
+                                                Throwable cause) {
+            return problem(origin, what, message, false, cause);
+        }
+
+        private static ProblemException problem(ConfigOrigin origin, String what, String message,
+                                                boolean suggestQuotes, Throwable cause) {
+            if (what == null || message == null)
+                throw new ConfigException.BugOrBroken(
+                        "internal error, creating bad ProblemException");
+            return new ProblemException(new TokenWithOrigin.Problem(origin, what, message, suggestQuotes,
+                    cause));
+        }
+
+        private static ProblemException problem(ConfigOrigin origin, String message) {
+            return problem(origin, "", message, null);
+        }
+
+        private static ConfigOrigin lineOrigin(ConfigOrigin baseOrigin,
+                                               int lineNumber) {
+            return ((SimpleConfigOrigin) baseOrigin).withLineNumber(lineNumber);
+        }
+
+        private static boolean isSimpleValue(Token t) {
+            return t instanceof TokenWithOrigin.Substitution || t instanceof TokenWithOrigin.UnquotedText
+                    || t instanceof TokenWithOrigin.Value;
+        }
 
         // this should ONLY be called from nextCharSkippingComments
         // or when inside a quoted string, or when parsing a sequence
@@ -172,14 +150,6 @@ final class Tokenizer {
             buffer.push(c);
         }
 
-        static boolean isWhitespace(int c) {
-            return ConfigImplUtil.isWhitespace(c);
-        }
-
-        static boolean isWhitespaceNotNewline(int c) {
-            return c != '\n' && ConfigImplUtil.isWhitespace(c);
-        }
-
         private boolean startOfComment(int c) {
             if (c == -1) {
                 return false;
@@ -191,11 +161,7 @@ final class Tokenizer {
                         int maybeSecondSlash = nextCharRaw();
                         // we want to predictably NOT consume any chars
                         putBack(maybeSecondSlash);
-                        if (maybeSecondSlash == '/') {
-                            return true;
-                        } else {
-                            return false;
-                        }
+                        return maybeSecondSlash == '/';
                     } else {
                         return false;
                     }
@@ -207,7 +173,7 @@ final class Tokenizer {
 
         // get next char, skipping non-newline whitespace
         private int nextCharAfterWhitespace(WhitespaceSaver saver) {
-            for (;;) {
+            for (; ; ) {
                 int c = nextCharRaw();
 
                 if (c == -1) {
@@ -240,32 +206,8 @@ final class Tokenizer {
         }
 
         private ProblemException problem(String what, String message, boolean suggestQuotes,
-                Throwable cause) {
+                                         Throwable cause) {
             return problem(lineOrigin, what, message, suggestQuotes, cause);
-        }
-
-        private static ProblemException problem(ConfigOrigin origin, String what,
-                String message,
-                Throwable cause) {
-            return problem(origin, what, message, false, cause);
-        }
-
-        private static ProblemException problem(ConfigOrigin origin, String what, String message,
-                boolean suggestQuotes, Throwable cause) {
-            if (what == null || message == null)
-                throw new ConfigException.BugOrBroken(
-                        "internal error, creating bad ProblemException");
-            return new ProblemException(Tokens.newProblem(origin, what, message, suggestQuotes,
-                    cause));
-        }
-
-        private static ProblemException problem(ConfigOrigin origin, String message) {
-            return problem(origin, "", message, null);
-        }
-
-        private static ConfigOrigin lineOrigin(ConfigOrigin baseOrigin,
-                int lineNumber) {
-            return ((SimpleConfigOrigin) baseOrigin).withLineNumber(lineNumber);
         }
 
         // ONE char has always been consumed, either the # or the first /, but
@@ -280,26 +222,19 @@ final class Tokenizer {
             }
 
             StringBuilder sb = new StringBuilder();
-            for (;;) {
+            for (; ; ) {
                 int c = nextCharRaw();
                 if (c == -1 || c == '\n') {
                     putBack(c);
                     if (doubleSlash)
-                        return Tokens.newCommentDoubleSlash(lineOrigin, sb.toString());
+                        return new TokenWithOrigin.Comment.DoubleSlashComment(lineOrigin, sb.toString());
                     else
-                        return Tokens.newCommentHash(lineOrigin, sb.toString());
+                        return new TokenWithOrigin.Comment.HashComment(lineOrigin, sb.toString());
                 } else {
                     sb.appendCodePoint(c);
                 }
             }
         }
-
-        // chars JSON allows a number to start with
-        static final String firstNumberChars = "0123456789-";
-        // chars JSON allows to be part of a number
-        static final String numberChars = "0123456789eE+-.";
-        // chars that stop an unquoted string
-        static final String notInUnquotedText = "$\"{}[]:=,+#`^?!@*&\\";
 
         // The rules here are intended to maximize convenience while
         // avoiding confusion with real valid JSON. Basically anything
@@ -328,13 +263,13 @@ final class Tokenizer {
                 if (sb.length() == 4) {
                     String s = sb.toString();
                     if (s.equals("true"))
-                        return Tokens.newBoolean(origin, true);
+                        return TokenWithOrigin.Value.newBoolean(origin, true);
                     else if (s.equals("null"))
-                        return Tokens.newNull(origin);
+                        return TokenWithOrigin.Value.newNull(origin);
                 } else if (sb.length() == 5) {
                     String s = sb.toString();
                     if (s.equals("false"))
-                        return Tokens.newBoolean(origin, false);
+                        return TokenWithOrigin.Value.newBoolean(origin, false);
                 }
 
                 c = nextCharRaw();
@@ -344,7 +279,7 @@ final class Tokenizer {
             putBack(c);
 
             String s = sb.toString();
-            return Tokens.newUnquotedText(origin, s);
+            return new TokenWithOrigin.UnquotedText(origin, s);
         }
 
         private Token pullNumber(int firstChar) throws ProblemException {
@@ -365,21 +300,21 @@ final class Tokenizer {
             try {
                 if (containedDecimalOrE) {
                     // force floating point representation
-                    return Tokens.newDouble(lineOrigin, Double.parseDouble(s), s);
+                    return TokenWithOrigin.Value.newDouble(lineOrigin, Double.parseDouble(s), s);
                 } else {
                     // this should throw if the integer is too large for Long
-                    return Tokens.newLong(lineOrigin, Long.parseLong(s), s);
+                    return TokenWithOrigin.Value.newLong(lineOrigin, Long.parseLong(s), s);
                 }
             } catch (NumberFormatException e) {
                 // not a number after all, see if it's an unquoted string.
                 for (char u : s.toCharArray()) {
                     if (notInUnquotedText.indexOf(u) >= 0)
                         throw problem(asString(u), "Reserved character '" + asString(u)
-                                      + "' is not allowed outside quotes", true /* suggestQuotes */);
+                                + "' is not allowed outside quotes", true /* suggestQuotes */);
                 }
                 // no evil chars so we just decide this was a string and
                 // not a number.
-                return Tokens.newUnquotedText(lineOrigin, s);
+                return new TokenWithOrigin.UnquotedText(lineOrigin, s);
             }
         }
 
@@ -394,55 +329,55 @@ final class Tokenizer {
             sbOrig.appendCodePoint(escaped);
 
             switch (escaped) {
-            case '"':
-                sb.append('"');
-                break;
-            case '\\':
-                sb.append('\\');
-                break;
-            case '/':
-                sb.append('/');
-                break;
-            case 'b':
-                sb.append('\b');
-                break;
-            case 'f':
-                sb.append('\f');
-                break;
-            case 'n':
-                sb.append('\n');
-                break;
-            case 'r':
-                sb.append('\r');
-                break;
-            case 't':
-                sb.append('\t');
-                break;
-            case 'u': {
-                // kind of absurdly slow, but screw it for now
-                char[] a = new char[4];
-                for (int i = 0; i < 4; ++i) {
-                    int c = nextCharRaw();
-                    if (c == -1)
-                        throw problem("End of input but expecting 4 hex digits for \\uXXXX escape");
-                    a[i] = (char) c;
+                case '"':
+                    sb.append('"');
+                    break;
+                case '\\':
+                    sb.append('\\');
+                    break;
+                case '/':
+                    sb.append('/');
+                    break;
+                case 'b':
+                    sb.append('\b');
+                    break;
+                case 'f':
+                    sb.append('\f');
+                    break;
+                case 'n':
+                    sb.append('\n');
+                    break;
+                case 'r':
+                    sb.append('\r');
+                    break;
+                case 't':
+                    sb.append('\t');
+                    break;
+                case 'u': {
+                    // kind of absurdly slow, but screw it for now
+                    char[] a = new char[4];
+                    for (int i = 0; i < 4; ++i) {
+                        int c = nextCharRaw();
+                        if (c == -1)
+                            throw problem("End of input but expecting 4 hex digits for \\uXXXX escape");
+                        a[i] = (char) c;
+                    }
+                    String digits = new String(a);
+                    sbOrig.append(a);
+                    try {
+                        sb.appendCodePoint(Integer.parseInt(digits, 16));
+                    } catch (NumberFormatException e) {
+                        throw problem(digits, String.format(
+                                "Malformed hex digits after \\u escape in string: '%s'", digits), e);
+                    }
                 }
-                String digits = new String(a);
-                sbOrig.append(a);
-                try {
-                    sb.appendCodePoint(Integer.parseInt(digits, 16));
-                } catch (NumberFormatException e) {
-                    throw problem(digits, String.format(
-                            "Malformed hex digits after \\u escape in string: '%s'", digits), e);
-                }
-            }
                 break;
-            default:
-                throw problem(
-                        asString(escaped),
-                        String.format(
-                                "backslash followed by '%s', this is not a valid escape sequence (quoted strings use JSON escaping, so use double-backslash \\\\ for literal backslash)",
-                                asString(escaped)));
+                default:
+                    throw problem(
+                            asString(escaped),
+                            String.format(
+                                    "backslash followed by '%s', this is not a valid escape sequence (quoted strings use JSON escaping, so use double-backslash \\\\ for literal backslash)",
+                                    asString(escaped)));
             }
         }
 
@@ -450,7 +385,7 @@ final class Tokenizer {
             // we are after the opening triple quote and need to consume the
             // close triple
             int consecutiveQuotes = 0;
-            for (;;) {
+            for (; ; ) {
                 int c = nextCharRaw();
 
                 if (c == '"') {
@@ -508,7 +443,7 @@ final class Tokenizer {
             }
 
             // maybe switch to triple-quoted string, sort of hacky...
-            if (sb.length() == 0) {
+            if (sb.isEmpty()) {
                 int third = nextCharRaw();
                 if (third == '"') {
                     sbOrig.appendCodePoint(third);
@@ -518,7 +453,7 @@ final class Tokenizer {
                 }
 
             }
-            return Tokens.newString(lineOrigin, sb.toString(), sbOrig.toString());
+            return TokenWithOrigin.Value.newString(lineOrigin, sb.toString(), sbOrig.toString());
         }
 
         private Token pullPlusEquals() throws ProblemException {
@@ -528,7 +463,7 @@ final class Tokenizer {
                 throw problem(asString(c), "'+' not followed by =, '" + asString(c)
                         + "' not allowed after '+'", true /* suggestQuotes */);
             }
-            return Tokens.PLUS_EQUALS;
+            return StaticToken.PLUS_EQUALS;
         }
 
         private Token pullSubstitution() throws ProblemException {
@@ -549,7 +484,7 @@ final class Tokenizer {
             }
 
             WhitespaceSaver saver = new WhitespaceSaver();
-            List<Token> expression = new ArrayList<Token>();
+            List<Token> expression = new ArrayList<>();
 
             Token t;
             do {
@@ -558,10 +493,10 @@ final class Tokenizer {
                 // note that we avoid validating the allowed tokens inside
                 // the substitution here; we even allow nested substitutions
                 // in the tokenizer. The parser sorts it out.
-                if (t == Tokens.CLOSE_CURLY) {
+                if (t == StaticToken.CLOSE_CURLY) {
                     // end the loop, done!
                     break;
-                } else if (t == Tokens.END) {
+                } else if (t == StaticToken.END) {
                     throw problem(origin,
                             "Substitution ${ was not closed with a }");
                 } else {
@@ -572,16 +507,16 @@ final class Tokenizer {
                 }
             } while (true);
 
-            return Tokens.newSubstitution(origin, optional, expression);
+            return new TokenWithOrigin.Substitution(origin, optional, expression);
         }
 
         private Token pullNextToken(WhitespaceSaver saver) throws ProblemException {
             int c = nextCharAfterWhitespace(saver);
             if (c == -1) {
-                return Tokens.END;
+                return StaticToken.END;
             } else if (c == '\n') {
                 // newline tokens have the just-ended line number
-                Token line = Tokens.newLine(lineOrigin);
+                Token line = new TokenWithOrigin.Line(lineOrigin);
                 lineNumber += 1;
                 lineOrigin = origin.withLineNumber(lineNumber);
                 return line;
@@ -590,41 +525,19 @@ final class Tokenizer {
                 if (startOfComment(c)) {
                     t = pullComment(c);
                 } else {
-                    switch (c) {
-                    case '"':
-                        t = pullQuotedString();
-                        break;
-                    case '$':
-                        t = pullSubstitution();
-                        break;
-                    case ':':
-                        t = Tokens.COLON;
-                        break;
-                    case ',':
-                        t = Tokens.COMMA;
-                        break;
-                    case '=':
-                        t = Tokens.EQUALS;
-                        break;
-                    case '{':
-                        t = Tokens.OPEN_CURLY;
-                        break;
-                    case '}':
-                        t = Tokens.CLOSE_CURLY;
-                        break;
-                    case '[':
-                        t = Tokens.OPEN_SQUARE;
-                        break;
-                    case ']':
-                        t = Tokens.CLOSE_SQUARE;
-                        break;
-                    case '+':
-                        t = pullPlusEquals();
-                        break;
-                    default:
-                        t = null;
-                        break;
-                    }
+                    t = switch (c) {
+                        case '"' -> pullQuotedString();
+                        case '$' -> pullSubstitution();
+                        case ':' -> StaticToken.COLON;
+                        case ',' -> StaticToken.COMMA;
+                        case '=' -> StaticToken.EQUALS;
+                        case '{' -> StaticToken.OPEN_CURLY;
+                        case '}' -> StaticToken.CLOSE_CURLY;
+                        case '[' -> StaticToken.OPEN_SQUARE;
+                        case ']' -> StaticToken.CLOSE_SQUARE;
+                        case '+' -> pullPlusEquals();
+                        default -> null;
+                    };
 
                     if (t == null) {
                         if (firstNumberChars.indexOf(c) >= 0) {
@@ -647,15 +560,6 @@ final class Tokenizer {
             }
         }
 
-        private static boolean isSimpleValue(Token t) {
-            if (Tokens.isSubstitution(t) || Tokens.isUnquotedText(t)
-                    || Tokens.isValue(t)) {
-                return true;
-            } else {
-                return false;
-            }
-        }
-
         private void queueNextToken() throws ProblemException {
             Token t = pullNextToken(whitespaceSaver);
             Token whitespace = whitespaceSaver.check(t, origin, lineNumber);
@@ -673,7 +577,7 @@ final class Tokenizer {
         @Override
         public Token next() {
             Token t = tokens.remove();
-            if (tokens.isEmpty() && t != Tokens.END) {
+            if (tokens.isEmpty() && t != StaticToken.END) {
                 try {
                     queueNextToken();
                 } catch (ProblemException e) {
@@ -690,6 +594,68 @@ final class Tokenizer {
         public void remove() {
             throw new UnsupportedOperationException(
                     "Does not make sense to remove items from token stream");
+        }
+
+        private static class WhitespaceSaver {
+            // has to be saved inside value concatenations
+            private final StringBuilder whitespace;
+            // may need to value-concat with next value
+            private boolean lastTokenWasSimpleValue;
+
+            WhitespaceSaver() {
+                whitespace = new StringBuilder();
+                lastTokenWasSimpleValue = false;
+            }
+
+            void add(int c) {
+                whitespace.appendCodePoint(c);
+            }
+
+            Token check(Token t, ConfigOrigin baseOrigin, int lineNumber) {
+                if (isSimpleValue(t)) {
+                    return nextIsASimpleValue(baseOrigin, lineNumber);
+                } else {
+                    return nextIsNotASimpleValue(baseOrigin, lineNumber);
+                }
+            }
+
+            // called if the next token is not a simple value;
+            // discards any whitespace we were saving between
+            // simple values.
+            private Token nextIsNotASimpleValue(ConfigOrigin baseOrigin, int lineNumber) {
+                lastTokenWasSimpleValue = false;
+                return createWhitespaceTokenFromSaver(baseOrigin, lineNumber);
+            }
+
+            // called if the next token IS a simple value,
+            // so creates a whitespace token if the previous
+            // token also was.
+            private Token nextIsASimpleValue(ConfigOrigin baseOrigin,
+                                             int lineNumber) {
+                Token t = createWhitespaceTokenFromSaver(baseOrigin, lineNumber);
+                if (!lastTokenWasSimpleValue) {
+                    lastTokenWasSimpleValue = true;
+                }
+                return t;
+            }
+
+            private Token createWhitespaceTokenFromSaver(ConfigOrigin baseOrigin,
+                                                         int lineNumber) {
+                if (!whitespace.isEmpty()) {
+                    Token t;
+                    if (lastTokenWasSimpleValue) {
+                        t = new TokenWithOrigin.UnquotedText(
+                                lineOrigin(baseOrigin, lineNumber),
+                                whitespace.toString());
+                    } else {
+                        t = new TokenWithOrigin.IgnoredWhitespace(lineOrigin(baseOrigin, lineNumber),
+                                whitespace.toString());
+                    }
+                    whitespace.setLength(0); // reset
+                    return t;
+                }
+                return null;
+            }
         }
     }
 }

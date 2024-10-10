@@ -1,5 +1,5 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config;
 
@@ -23,15 +23,14 @@ public interface ConfigIncludeContext {
      * null if it can't meaningfully create a relative name. The returned
      * parseable may not exist; this function is not required to do any IO, just
      * compute what the name would be.
-     *
+     * <p>
      * The passed-in filename has to be a complete name (with extension), not
      * just a basename. (Include statements in config files are allowed to give
      * just a basename.)
      *
-     * @param filename
-     *            the name to make relative to the resource doing the including
+     * @param filename the name to make relative to the resource doing the including
      * @return parseable item relative to the resource doing the including, or
-     *         null
+     * null
      */
     ConfigParseable relativeTo(String filename);
 
@@ -49,7 +48,6 @@ public interface ConfigIncludeContext {
      * Copy this {@link ConfigIncludeContext} giving it a new value for its parseOptions.
      *
      * @param options new parse options to use
-     *
      * @return the updated copy of this context
      */
     ConfigIncludeContext setParseOptions(ConfigParseOptions options);

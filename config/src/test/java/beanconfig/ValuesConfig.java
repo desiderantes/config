@@ -1,11 +1,11 @@
 package beanconfig;
 
-import java.util.Map;
-
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigList;
 import com.typesafe.config.ConfigObject;
 import com.typesafe.config.ConfigValue;
+
+import java.util.Map;
 
 // test bean for various "uncooked" values
 public class ValuesConfig {
@@ -15,7 +15,7 @@ public class ValuesConfig {
     ConfigObject configObj;
     ConfigValue configValue;
     ConfigList list;
-    Map<String,Object> unwrappedMap;
+    Map<String, Object> unwrappedMap;
 
     public Object getObj() {
         return obj;

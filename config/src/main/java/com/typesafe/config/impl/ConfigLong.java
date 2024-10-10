@@ -1,18 +1,20 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
-
-import java.io.ObjectStreamException;
-import java.io.Serializable;
 
 import com.typesafe.config.ConfigOrigin;
 import com.typesafe.config.ConfigValueType;
 import com.typesafe.config.parser.ConfigNodeLong;
 import com.typesafe.config.parser.ConfigNodeVisitor;
 
+import java.io.ObjectStreamException;
+import java.io.Serial;
+import java.io.Serializable;
+
 final class ConfigLong extends ConfigNumber implements Serializable, ConfigNodeLong {
 
+    @Serial
     private static final long serialVersionUID = 2L;
 
     final private long value;
@@ -57,6 +59,7 @@ final class ConfigLong extends ConfigNumber implements Serializable, ConfigNodeL
     }
 
     // serialization all goes through SerializedConfigValue
+    @Serial
     private Object writeReplace() throws ObjectStreamException {
         return new SerializedConfigValue(this);
     }

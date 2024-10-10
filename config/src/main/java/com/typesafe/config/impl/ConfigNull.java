@@ -1,10 +1,7 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
-
-import java.io.ObjectStreamException;
-import java.io.Serializable;
 
 import com.typesafe.config.ConfigOrigin;
 import com.typesafe.config.ConfigRenderOptions;
@@ -12,16 +9,20 @@ import com.typesafe.config.ConfigValueType;
 import com.typesafe.config.parser.ConfigNodeNull;
 import com.typesafe.config.parser.ConfigNodeVisitor;
 
+import java.io.ObjectStreamException;
+import java.io.Serial;
+import java.io.Serializable;
+
 /**
  * This exists because sometimes null is not the same as missing. Specifically,
  * if a value is set to null we can give a better error message (indicating
  * where it was set to null) in case someone asks for the value. Also, null
  * overrides values set "earlier" in the search path, while missing values do
  * not.
- *
  */
 final class ConfigNull extends AbstractConfigValue implements Serializable, ConfigNodeNull {
 
+    @Serial
     private static final long serialVersionUID = 2L;
 
     ConfigNull(ConfigOrigin origin) {
@@ -54,6 +55,7 @@ final class ConfigNull extends AbstractConfigValue implements Serializable, Conf
     }
 
     // serialization all goes through SerializedConfigValue
+    @Serial
     private Object writeReplace() throws ObjectStreamException {
         return new SerializedConfigValue(this);
     }

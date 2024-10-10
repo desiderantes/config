@@ -1,5 +1,5 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config;
 
@@ -15,7 +15,7 @@ package com.typesafe.config;
  * This object is immutable, so the "setters" return a new object.
  * <p>
  * Here is an example of creating a custom {@code ConfigResolveOptions}:
- * 
+ *
  * <pre>
  *     ConfigResolveOptions options = ConfigResolveOptions.defaults()
  *         .setUseSystemEnvironment(false)
@@ -27,6 +27,22 @@ package com.typesafe.config;
  * environment variables are the only example.)
  */
 public final class ConfigResolveOptions {
+    /**
+     * Singleton resolver that never resolves paths.
+     */
+    private static final ConfigResolver NULL_RESOLVER = new ConfigResolver() {
+
+        @Override
+        public ConfigValue lookup(String path) {
+            return null;
+        }
+
+        @Override
+        public ConfigResolver withFallback(ConfigResolver fallback) {
+            return fallback;
+        }
+
+    };
     private final boolean useSystemEnvironment;
     private final boolean allowUnresolved;
     private final ConfigResolver resolver;
@@ -41,7 +57,7 @@ public final class ConfigResolveOptions {
     /**
      * Returns the default resolve options. By default the system environment
      * will be used and unresolved substitutions are not allowed.
-     * 
+     *
      * @return the default resolve options
      */
     public static ConfigResolveOptions defaults() {
@@ -59,18 +75,6 @@ public final class ConfigResolveOptions {
     }
 
     /**
-     * Returns options with use of environment variables set to the given value.
-     *
-     * @param value
-     *            true to resolve substitutions falling back to environment
-     *            variables.
-     * @return options with requested setting for use of environment variables
-     */
-    public ConfigResolveOptions setUseSystemEnvironment(boolean value) {
-        return new ConfigResolveOptions(value, allowUnresolved, resolver);
-    }
-
-    /**
      * Returns whether the options enable use of system environment variables.
      * This method is mostly used by the config lib internally, not by
      * applications.
@@ -82,19 +86,14 @@ public final class ConfigResolveOptions {
     }
 
     /**
-     * Returns options with "allow unresolved" set to the given value. By
-     * default, unresolved substitutions are an error. If unresolved
-     * substitutions are allowed, then a future attempt to use the unresolved
-     * value may fail, but {@link Config#resolve(ConfigResolveOptions)} itself
-     * will not throw.
-     * 
-     * @param value
-     *            true to silently ignore unresolved substitutions.
-     * @return options with requested setting for whether to allow substitutions
-     * @since 1.2.0
+     * Returns options with use of environment variables set to the given value.
+     *
+     * @param value true to resolve substitutions falling back to environment
+     *              variables.
+     * @return options with requested setting for use of environment variables
      */
-    public ConfigResolveOptions setAllowUnresolved(boolean value) {
-        return new ConfigResolveOptions(useSystemEnvironment, value, resolver);
+    public ConfigResolveOptions setUseSystemEnvironment(boolean value) {
+        return new ConfigResolveOptions(value, allowUnresolved, resolver);
     }
 
     /**
@@ -104,20 +103,21 @@ public final class ConfigResolveOptions {
      * config itself and with any other resolvers that have been appended before
      * this one. Multiple resolvers can be added using,
      *
-     *  <pre>
+     * <pre>
      *     ConfigResolveOptions options = ConfigResolveOptions.defaults()
      *         .appendResolver(primary)
      *         .appendResolver(secondary)
      *         .appendResolver(tertiary);
      * </pre>
-     *
+     * <p>
      * With this config unresolved references will first be resolved with the
      * primary resolver, if that fails then the secondary, and finally if that
      * also fails the tertiary.
-     *
+     * <p>
      * If all fallbacks fail to return a substitution "allow unresolved"
      * determines whether resolution fails or continues.
-     *`
+     * `
+     *
      * @param value the resolver to fall back to
      * @return options that use the given resolver as a fallback
      * @since 1.3.2
@@ -148,7 +148,7 @@ public final class ConfigResolveOptions {
     /**
      * Returns whether the options allow unresolved substitutions. This method
      * is mostly used by the config lib internally, not by applications.
-     * 
+     *
      * @return true if unresolved substitutions are allowed
      * @since 1.2.0
      */
@@ -157,20 +157,18 @@ public final class ConfigResolveOptions {
     }
 
     /**
-     * Singleton resolver that never resolves paths.
+     * Returns options with "allow unresolved" set to the given value. By
+     * default, unresolved substitutions are an error. If unresolved
+     * substitutions are allowed, then a future attempt to use the unresolved
+     * value may fail, but {@link Config#resolve(ConfigResolveOptions)} itself
+     * will not throw.
+     *
+     * @param value true to silently ignore unresolved substitutions.
+     * @return options with requested setting for whether to allow substitutions
+     * @since 1.2.0
      */
-    private static final ConfigResolver NULL_RESOLVER = new ConfigResolver() {
-
-        @Override
-        public ConfigValue lookup(String path) {
-            return null;
-        }
-
-        @Override
-        public ConfigResolver withFallback(ConfigResolver fallback) {
-            return fallback;
-        }
-
-    };
+    public ConfigResolveOptions setAllowUnresolved(boolean value) {
+        return new ConfigResolveOptions(useSystemEnvironment, value, resolver);
+    }
 
 }

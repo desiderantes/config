@@ -1,14 +1,17 @@
 package com.typesafe.config.impl;
 
+import com.typesafe.config.ConfigException;
+import com.typesafe.config.ConfigParseOptions;
+import com.typesafe.config.ConfigRenderOptions;
+import com.typesafe.config.ConfigValue;
+import com.typesafe.config.parser.ConfigDocument;
+
 import java.io.StringReader;
 import java.util.Iterator;
 
-import com.typesafe.config.*;
-import com.typesafe.config.parser.ConfigDocument;
-
-final class SimpleConfigDocument implements ConfigDocument {
-    private ConfigNodeRoot configNodeTree;
-    private ConfigParseOptions parseOptions;
+public final class SimpleConfigDocument implements ConfigDocument {
+    private final ConfigNodeRoot configNodeTree;
+    private final ConfigParseOptions parseOptions;
 
     SimpleConfigDocument(ConfigNodeRoot parsedNode, ConfigParseOptions parseOptions) {
         configNodeTree = parsedNode;

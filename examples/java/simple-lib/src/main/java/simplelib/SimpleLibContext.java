@@ -8,14 +8,14 @@ import com.typesafe.config.*;
 // where it's convenient to place the configuration.
 
 public class SimpleLibContext {
-    private Config config;
+    private final Config config;
 
     // we have a constructor allowing the app to provide a custom Config
     public SimpleLibContext(Config config) {
         this.config = config;
         // This verifies that the Config is sane and has our
         // reference config. Importantly, we specify the "simple-lib"
-        // path so we only validate settings that belong to this
+        // path, so we only validate settings that belong to this
         // library. Otherwise, we might throw mistaken errors about
         // settings we know nothing about.
         config.checkValid(ConfigFactory.defaultReference(), "simple-lib");

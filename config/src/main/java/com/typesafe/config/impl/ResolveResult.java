@@ -1,19 +1,14 @@
 package com.typesafe.config.impl;
 
 import com.typesafe.config.ConfigException;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 // value is allowed to be null
-final class ResolveResult<V extends AbstractConfigValue> {
-    public final ResolveContext context;
-    public final V value;
-
-    private ResolveResult(ResolveContext context, V value) {
-        this.context = context;
-        this.value = value;
-    }
+record ResolveResult<V extends AbstractConfigValue>(@NotNull ResolveContext context, @Nullable V value) {
 
     static <V extends AbstractConfigValue> ResolveResult<V> make(ResolveContext context, V value) {
-        return new ResolveResult<V>(context, value);
+        return new ResolveResult<>(context, value);
     }
 
     // better option? we don't have variance
@@ -33,7 +28,7 @@ final class ResolveResult<V extends AbstractConfigValue> {
     }
 
     ResolveResult<V> popTrace() {
-        return make(context.popTrace(), value);
+        return new ResolveResult<>(context.popTrace(), value);
     }
 
     @Override

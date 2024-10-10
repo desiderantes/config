@@ -1,27 +1,27 @@
 /**
- *   Copyright (C) 2015 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2015 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
 
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.parser.ConfigNode;
 import com.typesafe.config.parser.ConfigNodePath;
 import com.typesafe.config.parser.ConfigNodeVisitor;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
 final class ConfigNodeField extends AbstractConfigNode implements com.typesafe.config.parser.ConfigNodeField {
     final private ArrayList<AbstractConfigNode> children;
 
     public ConfigNodeField(Collection<AbstractConfigNode> children) {
-        this.children = new ArrayList<AbstractConfigNode>(children);
+        this.children = new ArrayList<>(children);
     }
 
     @Override
     protected Collection<Token> tokens() {
-        ArrayList<Token> tokens = new ArrayList<Token>();
+        ArrayList<Token> tokens = new ArrayList<>();
         for (AbstractConfigNode child : children) {
             tokens.addAll(child.tokens());
         }
@@ -29,7 +29,7 @@ final class ConfigNodeField extends AbstractConfigNode implements com.typesafe.c
     }
 
     public ConfigNodeField replaceValue(AbstractConfigNodeValue newValue) {
-        ArrayList<AbstractConfigNode> childrenCopy = new ArrayList<AbstractConfigNode>(children);
+        ArrayList<AbstractConfigNode> childrenCopy = new ArrayList<>(children);
         for (int i = 0; i < childrenCopy.size(); i++) {
             if (childrenCopy.get(i) instanceof AbstractConfigNodeValue) {
                 childrenCopy.set(i, newValue);
@@ -40,28 +40,28 @@ final class ConfigNodeField extends AbstractConfigNode implements com.typesafe.c
     }
 
     public AbstractConfigNodeValue value() {
-        for (int i = 0; i < children.size(); i++) {
-            if (children.get(i) instanceof AbstractConfigNodeValue) {
-                return (AbstractConfigNodeValue)children.get(i);
+        for (AbstractConfigNode child : children) {
+            if (child instanceof AbstractConfigNodeValue) {
+                return (AbstractConfigNodeValue) child;
             }
         }
         throw new ConfigException.BugOrBroken("Field node doesn't have a value");
     }
 
     public ConfigNodeParsedPath path() {
-        for (int i = 0; i < children.size(); i++) {
-            if (children.get(i) instanceof ConfigNodeParsedPath) {
-                return (ConfigNodeParsedPath)children.get(i);
+        for (AbstractConfigNode child : children) {
+            if (child instanceof ConfigNodeParsedPath) {
+                return (ConfigNodeParsedPath) child;
             }
         }
         throw new ConfigException.BugOrBroken("Field node doesn't have a path");
     }
 
-    protected Token separator() {
+    Token separator() {
         for (AbstractConfigNode child : children) {
             if (child instanceof ConfigNodeSingleToken) {
                 Token t = ((ConfigNodeSingleToken) child).token();
-                if (t == Tokens.PLUS_EQUALS || t == Tokens.COLON || t == Tokens.EQUALS) {
+                if (t == StaticToken.PLUS_EQUALS || t == StaticToken.COLON || t == StaticToken.EQUALS) {
                     return t;
                 }
             }
@@ -69,8 +69,8 @@ final class ConfigNodeField extends AbstractConfigNode implements com.typesafe.c
         return null;
     }
 
-    protected List<String> comments() {
-        List<String> comments = new ArrayList<String>();
+    List<String> comments() {
+        List<String> comments = new ArrayList<>();
         for (AbstractConfigNode child : children) {
             if (child instanceof ConfigNodeComment) {
                 comments.add(((ConfigNodeComment) child).commentText());

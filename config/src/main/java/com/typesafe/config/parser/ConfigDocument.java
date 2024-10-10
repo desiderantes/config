@@ -1,12 +1,12 @@
 /**
  * Copyright (C) 2011-2021, Config project contributors
- *   
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
- *         http://www.apache.org/licenses/LICENSE-2.0
- * 
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -35,7 +35,7 @@ import com.typesafe.config.ConfigValue;
  * Also, this interface is likely to grow new methods over time, so third-party
  * implementations will break.
  */
-public interface ConfigDocument {
+public sealed interface ConfigDocument permits com.typesafe.config.impl.SimpleConfigDocument {
     /**
      * Returns a new ConfigDocument that is a copy of the current ConfigDocument,
      * but with the desired value set at the desired path. If the path exists, it will
@@ -43,7 +43,7 @@ public interface ConfigDocument {
      * at the final occurrence of the path. If the path does not exist, it will be added. If
      * the document has an array as the root value, an exception will be thrown.
      *
-     * @param path the path at which to set the desired value
+     * @param path     the path at which to set the desired value
      * @param newValue the value to set at the desired path, represented as a string. This
      *                 string will be parsed into a ConfigNode using the same options used to
      *                 parse the entire document, and the text will be inserted
@@ -62,7 +62,7 @@ public interface ConfigDocument {
      * desired path. Works like {@link #withValueText(String, String)},
      * but takes a ConfigValue instead of a string.
      *
-     * @param path the path at which to set the desired value
+     * @param path     the path at which to set the desired value
      * @param newValue the value to set at the desired path, represented as a ConfigValue.
      *                 The rendered text of the ConfigValue will be inserted into the
      *                 ConfigDocument.
@@ -82,8 +82,9 @@ public interface ConfigDocument {
     ConfigDocument withoutPath(String path);
 
     /**
-     * Returns a boolean indicating whether or not a ConfigDocument has a value at the desired path.
+     * Returns a boolean indicating whether a ConfigDocument has a value at the desired path.
      * null counts as a value for purposes of this check.
+     *
      * @param path the path to check
      * @return true if the path exists in the document, otherwise false
      */
@@ -92,6 +93,7 @@ public interface ConfigDocument {
     /**
      * The original text of the input, modified if necessary with
      * any replaced or added values.
+     *
      * @return the modified original text
      */
     String render();
@@ -99,6 +101,7 @@ public interface ConfigDocument {
     /**
      * Returns the root node of this document's Abstract Syntax Tree (AST) for
      * traversing and doing AST changes on.
+     *
      * @return The AST root node
      */
     ConfigNodeRoot getRoot();

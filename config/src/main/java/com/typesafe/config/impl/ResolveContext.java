@@ -1,14 +1,11 @@
 package com.typesafe.config.impl;
 
-import java.util.Collections;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Set;
-
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigResolveOptions;
 import com.typesafe.config.impl.AbstractConfigValue.NotPossibleToResolve;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.*;
 
 final class ResolveContext {
     final private ResolveMemos memos;
@@ -19,7 +16,7 @@ final class ResolveContext {
     // any sibling of an object we're traversing could
     // cause a cycle "by side effect"
     // CAN BE NULL for a full resolve.
-    final private Path restrictToChild;
+    final private @Nullable Path restrictToChild;
 
     // This is used for tracing and debugging and nice error messages;
     // contains every node as we call resolve on it.
@@ -27,8 +24,8 @@ final class ResolveContext {
 
     final private Set<AbstractConfigValue> cycleMarkers;
 
-    ResolveContext(ResolveMemos memos, ConfigResolveOptions options, Path restrictToChild,
-            List<AbstractConfigValue> resolveStack, Set<AbstractConfigValue> cycleMarkers) {
+    ResolveContext(ResolveMemos memos, ConfigResolveOptions options, @Nullable Path restrictToChild,
+                   List<AbstractConfigValue> resolveStack, Set<AbstractConfigValue> cycleMarkers) {
         this.memos = memos;
         this.options = options;
         this.restrictToChild = restrictToChild;
@@ -40,16 +37,30 @@ final class ResolveContext {
         this.cycleMarkers = cycleMarkers;
     }
 
-    private static Set<AbstractConfigValue> newCycleMarkers() {
-        return Collections.newSetFromMap(new IdentityHashMap<AbstractConfigValue, Boolean>());
-    }
-
-    ResolveContext(ConfigResolveOptions options, Path restrictToChild) {
+    ResolveContext(ConfigResolveOptions options, @Nullable Path restrictToChild) {
         // LinkedHashSet keeps the traversal order which is at least useful
         // in error messages if nothing else
-        this(new ResolveMemos(), options, restrictToChild, new ArrayList<AbstractConfigValue>(), newCycleMarkers());
+        this(new ResolveMemos(), options, restrictToChild, new ArrayList<>(), newCycleMarkers());
         if (ConfigImpl.traceSubstitutionsEnabled())
             ConfigImpl.trace(depth(), "ResolveContext restrict to child " + restrictToChild);
+    }
+
+    private static Set<AbstractConfigValue> newCycleMarkers() {
+        return Collections.newSetFromMap(new IdentityHashMap<>());
+    }
+
+    static @Nullable AbstractConfigValue resolve(AbstractConfigValue value, AbstractConfigObject root,
+                                                 ConfigResolveOptions options) {
+        ResolveSource source = new ResolveSource(root);
+        ResolveContext context = new ResolveContext(options, null /* restrictToChild */);
+
+        try {
+            return context.resolve(value, source).value();
+        } catch (NotPossibleToResolve e) {
+            // ConfigReference was supposed to catch NotPossibleToResolve
+            throw new ConfigException.BugOrBroken(
+                    "NotPossibleToResolve was thrown from an outermost resolve", e);
+        }
     }
 
     ResolveContext addCycleMarker(AbstractConfigValue value) {
@@ -111,7 +122,7 @@ final class ResolveContext {
                 sb.append(separator);
             }
         }
-        if (sb.length() > 0)
+        if (!sb.isEmpty())
             sb.setLength(sb.length() - separator.length());
         return sb.toString();
     }
@@ -119,14 +130,14 @@ final class ResolveContext {
     private ResolveContext pushTrace(AbstractConfigValue value) {
         if (ConfigImpl.traceSubstitutionsEnabled())
             ConfigImpl.trace(depth(), "pushing trace " + value);
-        List<AbstractConfigValue> copy = new ArrayList<AbstractConfigValue>(resolveStack);
+        List<AbstractConfigValue> copy = new ArrayList<>(resolveStack);
         copy.add(value);
         return new ResolveContext(memos, options, restrictToChild, copy, cycleMarkers);
     }
 
     ResolveContext popTrace() {
-        List<AbstractConfigValue> copy = new ArrayList<AbstractConfigValue>(resolveStack);
-        AbstractConfigValue old = copy.remove(resolveStack.size() - 1);
+        List<AbstractConfigValue> copy = new ArrayList<>(resolveStack);
+        AbstractConfigValue old = copy.removeLast();
         if (ConfigImpl.traceSubstitutionsEnabled())
             ConfigImpl.trace(depth() - 1, "popped trace " + old);
         return new ResolveContext(memos, options, restrictToChild, copy, cycleMarkers);
@@ -181,13 +192,13 @@ final class ResolveContext {
             }
 
             ResolveResult<? extends AbstractConfigValue> result = original.resolveSubstitutions(this, source);
-            AbstractConfigValue resolved = result.value;
+            AbstractConfigValue resolved = result.value();
 
             if (ConfigImpl.traceSubstitutionsEnabled())
                 ConfigImpl.trace(depth(), "resolved to " + resolved + "@" + System.identityHashCode(resolved)
                         + " from " + original + "@" + System.identityHashCode(resolved));
 
-            ResolveContext withMemo = result.context;
+            ResolveContext withMemo = result.context();
 
             if (resolved == null || resolved.resolveStatus() == ResolveStatus.RESOLVED) {
                 // if the resolved object is fully resolved by resolving
@@ -223,20 +234,6 @@ final class ResolveContext {
             }
 
             return ResolveResult.make(withMemo, resolved);
-        }
-    }
-
-    static AbstractConfigValue resolve(AbstractConfigValue value, AbstractConfigObject root,
-            ConfigResolveOptions options) {
-        ResolveSource source = new ResolveSource(root);
-        ResolveContext context = new ResolveContext(options, null /* restrictToChild */);
-
-        try {
-            return context.resolve(value, source).value;
-        } catch (NotPossibleToResolve e) {
-            // ConfigReference was supposed to catch NotPossibleToResolve
-            throw new ConfigException.BugOrBroken(
-                    "NotPossibleToResolve was thrown from an outermost resolve", e);
         }
     }
 }

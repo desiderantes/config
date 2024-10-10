@@ -2,7 +2,7 @@ package beanconfig;
 
 import java.util.List;
 
-public class ValidationBeanConfig extends TestBeanConfig{
+public class ValidationBeanConfig extends TestBeanConfig {
 
     private String propNotListedInConfig;
     private int shouldBeInt;

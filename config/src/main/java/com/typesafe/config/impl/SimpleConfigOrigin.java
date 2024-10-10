@@ -1,28 +1,25 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigOrigin;
 import com.typesafe.config.impl.SerializedConfigValue.SerializedField;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.Serializable;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.*;
+
 // it would be cleaner to have a class hierarchy for various origin types,
 // but was hoping this would be enough simpler to be a little messy. eh.
-final class SimpleConfigOrigin implements ConfigOrigin {
+final class SimpleConfigOrigin implements ConfigOrigin, Serializable {
 
+    static final String MERGE_OF_PREFIX = "merge of ";
     final private String description;
     final private int lineNumber;
     final private int endLineNumber;
@@ -32,7 +29,7 @@ final class SimpleConfigOrigin implements ConfigOrigin {
     final private List<String> commentsOrNull;
 
     protected SimpleConfigOrigin(String description, int lineNumber, int endLineNumber, OriginType originType,
-            String urlOrNull, String resourceOrNull, List<String> commentsOrNull) {
+                                 String urlOrNull, String resourceOrNull, List<String> commentsOrNull) {
         if (description == null)
             throw new ConfigException.BugOrBroken("description may not be null");
         this.description = description;
@@ -49,27 +46,23 @@ final class SimpleConfigOrigin implements ConfigOrigin {
     }
 
     static SimpleConfigOrigin newFile(String filename) {
-        String url;
-        try {
-            url = (new File(filename)).toURI().toURL().toExternalForm();
-        } catch (MalformedURLException e) {
-            url = null;
-        }
+        String url = new File(filename).toURI().toASCIIString();
         return new SimpleConfigOrigin(filename, -1, -1, OriginType.FILE, url, null, null);
     }
 
-    static SimpleConfigOrigin newURL(URL url) {
-        String u = url.toExternalForm();
-        return new SimpleConfigOrigin(u, -1, -1, OriginType.URL, u, null, null);
+    static SimpleConfigOrigin newURL(URI url) {
+        String u = url.toASCIIString();
+        return new SimpleConfigOrigin(u, -1, -1, OriginType.URI, u, null, null);
     }
 
-    static SimpleConfigOrigin newResource(String resource, URL url) {
+    static SimpleConfigOrigin newResource(String resource, URI url) {
         String desc;
-        if (url != null)
-            desc = resource + " @ " + url.toExternalForm();
-        else
+        if (url != null) {
+            desc = resource + " @ " + url.toASCIIString();
+        } else {
             desc = resource;
-        return new SimpleConfigOrigin(desc, -1, -1, OriginType.RESOURCE, url != null ? url.toExternalForm() : null,
+        }
+        return new SimpleConfigOrigin(desc, -1, -1, OriginType.RESOURCE, url != null ? url.toASCIIString() : null,
                 resource, null);
     }
 
@@ -80,159 +73,6 @@ final class SimpleConfigOrigin implements ConfigOrigin {
     static SimpleConfigOrigin newEnvVariable(String description) {
         return new SimpleConfigOrigin(description, -1, -1, OriginType.ENV_VARIABLE, null, null, null);
     }
-
-    @Override
-    public SimpleConfigOrigin withLineNumber(int lineNumber) {
-        if (lineNumber == this.lineNumber && lineNumber == this.endLineNumber) {
-            return this;
-        } else {
-            return new SimpleConfigOrigin(this.description, lineNumber, lineNumber, this.originType, this.urlOrNull,
-                    this.resourceOrNull, this.commentsOrNull);
-        }
-    }
-
-    SimpleConfigOrigin addURL(URL url) {
-        return new SimpleConfigOrigin(this.description, this.lineNumber, this.endLineNumber, this.originType,
-                url != null ? url.toExternalForm() : null, this.resourceOrNull, this.commentsOrNull);
-    }
-
-    @Override
-    public SimpleConfigOrigin withComments(List<String> comments) {
-        if (ConfigImplUtil.equalsHandlingNull(comments, this.commentsOrNull)) {
-            return this;
-        } else {
-            return new SimpleConfigOrigin(this.description, this.lineNumber, this.endLineNumber, this.originType,
-                    this.urlOrNull, this.resourceOrNull, comments);
-        }
-    }
-
-    SimpleConfigOrigin prependComments(List<String> comments) {
-        if (ConfigImplUtil.equalsHandlingNull(comments, this.commentsOrNull) || comments == null) {
-            return this;
-        } else if (this.commentsOrNull == null) {
-            return withComments(comments);
-        } else {
-            List<String> merged = new ArrayList<String>(comments.size() + this.commentsOrNull.size());
-            merged.addAll(comments);
-            merged.addAll(this.commentsOrNull);
-            return withComments(merged);
-        }
-    }
-
-    SimpleConfigOrigin appendComments(List<String> comments) {
-        if (ConfigImplUtil.equalsHandlingNull(comments, this.commentsOrNull) || comments == null) {
-            return this;
-        } else if (this.commentsOrNull == null) {
-            return withComments(comments);
-        } else {
-            List<String> merged = new ArrayList<String>(comments.size() + this.commentsOrNull.size());
-            merged.addAll(this.commentsOrNull);
-            merged.addAll(comments);
-            return withComments(merged);
-        }
-    }
-
-    @Override
-    public String description() {
-        if (lineNumber < 0) {
-            return description;
-        } else if (endLineNumber == lineNumber) {
-            return description + ": " + lineNumber;
-        } else {
-            return description + ": " + lineNumber + "-" + endLineNumber;
-        }
-    }
-
-    OriginType originType() {
-        return originType;
-    }
-
-    @Override
-    public boolean equals(Object other) {
-        if (other instanceof SimpleConfigOrigin) {
-            SimpleConfigOrigin otherOrigin = (SimpleConfigOrigin) other;
-
-            return this.description.equals(otherOrigin.description) && this.lineNumber == otherOrigin.lineNumber
-                    && this.endLineNumber == otherOrigin.endLineNumber && this.originType == otherOrigin.originType
-                    && ConfigImplUtil.equalsHandlingNull(this.urlOrNull, otherOrigin.urlOrNull)
-                    && ConfigImplUtil.equalsHandlingNull(this.resourceOrNull, otherOrigin.resourceOrNull);
-        } else {
-            return false;
-        }
-    }
-
-    @Override
-    public int hashCode() {
-        int h = 41 * (41 + description.hashCode());
-        h = 41 * (h + lineNumber);
-        h = 41 * (h + endLineNumber);
-        h = 41 * (h + originType.hashCode());
-        if (urlOrNull != null)
-            h = 41 * (h + urlOrNull.hashCode());
-        if (resourceOrNull != null)
-            h = 41 * (h + resourceOrNull.hashCode());
-        return h;
-    }
-
-    @Override
-    public String toString() {
-        return "ConfigOrigin(" + description + ")";
-    }
-
-    @Override
-    public String filename() {
-        if (originType == OriginType.FILE) {
-            return description;
-        } else if (urlOrNull != null) {
-            URL url;
-            try {
-                url = new URL(urlOrNull);
-            } catch (MalformedURLException e) {
-                return null;
-            }
-            if (url.getProtocol().equals("file")) {
-                return url.getFile();
-            } else {
-                return null;
-            }
-        } else {
-            return null;
-        }
-    }
-
-    @Override
-    public URL url() {
-        if (urlOrNull == null) {
-            return null;
-        } else {
-            try {
-                return new URL(urlOrNull);
-            } catch (MalformedURLException e) {
-                return null;
-            }
-        }
-    }
-
-    @Override
-    public String resource() {
-        return resourceOrNull;
-    }
-
-    @Override
-    public int lineNumber() {
-        return lineNumber;
-    }
-
-    @Override
-    public List<String> comments() {
-        if (commentsOrNull != null) {
-            return Collections.unmodifiableList(commentsOrNull);
-        } else {
-            return Collections.emptyList();
-        }
-    }
-
-    static final String MERGE_OF_PREFIX = "merge of ";
 
     private static SimpleConfigOrigin mergeTwo(SimpleConfigOrigin a, SimpleConfigOrigin b) {
         String mergedDesc;
@@ -304,7 +144,7 @@ final class SimpleConfigOrigin implements ConfigOrigin {
         if (ConfigImplUtil.equalsHandlingNull(a.commentsOrNull, b.commentsOrNull)) {
             mergedComments = a.commentsOrNull;
         } else {
-            mergedComments = new ArrayList<String>();
+            mergedComments = new ArrayList<>();
             if (a.commentsOrNull != null)
                 mergedComments.addAll(a.commentsOrNull);
             if (b.commentsOrNull != null)
@@ -356,7 +196,7 @@ final class SimpleConfigOrigin implements ConfigOrigin {
     }
 
     static ConfigOrigin mergeOrigins(List<? extends AbstractConfigValue> stack) {
-        List<ConfigOrigin> origins = new ArrayList<ConfigOrigin>(stack.size());
+        List<ConfigOrigin> origins = new ArrayList<>(stack.size());
         for (AbstractConfigValue v : stack) {
             origins.add(v.origin());
         }
@@ -372,17 +212,17 @@ final class SimpleConfigOrigin implements ConfigOrigin {
             Iterator<? extends ConfigOrigin> i = stack.iterator();
             return mergeTwo((SimpleConfigOrigin) i.next(), (SimpleConfigOrigin) i.next());
         } else {
-            List<SimpleConfigOrigin> remaining = new ArrayList<SimpleConfigOrigin>(stack.size());
+            List<SimpleConfigOrigin> remaining = new ArrayList<>(stack.size());
             for (ConfigOrigin o : stack) {
                 remaining.add((SimpleConfigOrigin) o);
             }
             while (remaining.size() > 2) {
-                SimpleConfigOrigin c = remaining.get(remaining.size() - 1);
-                remaining.remove(remaining.size() - 1);
-                SimpleConfigOrigin b = remaining.get(remaining.size() - 1);
-                remaining.remove(remaining.size() - 1);
-                SimpleConfigOrigin a = remaining.get(remaining.size() - 1);
-                remaining.remove(remaining.size() - 1);
+                SimpleConfigOrigin c = remaining.getLast();
+                remaining.removeLast();
+                SimpleConfigOrigin b = remaining.getLast();
+                remaining.removeLast();
+                SimpleConfigOrigin a = remaining.getLast();
+                remaining.removeLast();
 
                 SimpleConfigOrigin merged = mergeThree(a, b, c);
 
@@ -394,44 +234,13 @@ final class SimpleConfigOrigin implements ConfigOrigin {
         }
     }
 
-    Map<SerializedField, Object> toFields() {
-        Map<SerializedField, Object> m = new EnumMap<SerializedField, Object>(SerializedField.class);
-
-        m.put(SerializedField.ORIGIN_DESCRIPTION, description);
-
-        if (lineNumber >= 0)
-            m.put(SerializedField.ORIGIN_LINE_NUMBER, lineNumber);
-        if (endLineNumber >= 0)
-            m.put(SerializedField.ORIGIN_END_LINE_NUMBER, endLineNumber);
-
-        m.put(SerializedField.ORIGIN_TYPE, originType.ordinal());
-
-        if (urlOrNull != null)
-            m.put(SerializedField.ORIGIN_URL, urlOrNull);
-        if (resourceOrNull != null)
-            m.put(SerializedField.ORIGIN_RESOURCE, resourceOrNull);
-        if (commentsOrNull != null)
-            m.put(SerializedField.ORIGIN_COMMENTS, commentsOrNull);
-
-        return m;
-    }
-
-    Map<SerializedField, Object> toFieldsDelta(SimpleConfigOrigin baseOrigin) {
-        Map<SerializedField, Object> baseFields;
-        if (baseOrigin != null)
-            baseFields = baseOrigin.toFields();
-        else
-            baseFields = Collections.<SerializedField, Object> emptyMap();
-        return fieldsDelta(baseFields, toFields());
-    }
-
     // Here we're trying to avoid serializing the same info over and over
     // in the common case that child objects have the same origin fields
     // as their parent objects. e.g. we don't need to store the source
     // filename with every single value.
     static Map<SerializedField, Object> fieldsDelta(Map<SerializedField, Object> base,
-            Map<SerializedField, Object> child) {
-        Map<SerializedField, Object> m = new EnumMap<SerializedField, Object>(child);
+                                                    Map<SerializedField, Object> child) {
+        Map<SerializedField, Object> m = new EnumMap<>(child);
 
         for (Map.Entry<SerializedField, Object> baseEntry : base.entrySet()) {
             SerializedField f = baseEntry.getKey();
@@ -441,37 +250,19 @@ final class SimpleConfigOrigin implements ConfigOrigin {
             } else if (!m.containsKey(f)) {
                 // if field has been removed, we have to add a deletion entry
                 switch (f) {
-                case ORIGIN_DESCRIPTION:
-                    throw new ConfigException.BugOrBroken("origin missing description field? " + child);
-                case ORIGIN_LINE_NUMBER:
-                    m.put(SerializedField.ORIGIN_LINE_NUMBER, -1);
-                    break;
-                case ORIGIN_END_LINE_NUMBER:
-                    m.put(SerializedField.ORIGIN_END_LINE_NUMBER, -1);
-                    break;
-                case ORIGIN_TYPE:
-                    throw new ConfigException.BugOrBroken("should always be an ORIGIN_TYPE field");
-                case ORIGIN_URL:
-                    m.put(SerializedField.ORIGIN_NULL_URL, "");
-                    break;
-                case ORIGIN_RESOURCE:
-                    m.put(SerializedField.ORIGIN_NULL_RESOURCE, "");
-                    break;
-                case ORIGIN_COMMENTS:
-                    m.put(SerializedField.ORIGIN_NULL_COMMENTS, "");
-                    break;
-                case ORIGIN_NULL_URL: // FALL THRU
-                case ORIGIN_NULL_RESOURCE: // FALL THRU
-                case ORIGIN_NULL_COMMENTS:
-                    throw new ConfigException.BugOrBroken("computing delta, base object should not contain " + f + " "
-                            + base);
-                case END_MARKER:
-                case ROOT_VALUE:
-                case ROOT_WAS_CONFIG:
-                case UNKNOWN:
-                case VALUE_DATA:
-                case VALUE_ORIGIN:
-                    throw new ConfigException.BugOrBroken("should not appear here: " + f);
+                    case ORIGIN_DESCRIPTION ->
+                            throw new ConfigException.BugOrBroken("origin missing description field? " + child);
+                    case ORIGIN_LINE_NUMBER -> m.put(SerializedField.ORIGIN_LINE_NUMBER, -1);
+                    case ORIGIN_END_LINE_NUMBER -> m.put(SerializedField.ORIGIN_END_LINE_NUMBER, -1);
+                    case ORIGIN_TYPE -> throw new ConfigException.BugOrBroken("should always be an ORIGIN_TYPE field");
+                    case ORIGIN_URL -> m.put(SerializedField.ORIGIN_NULL_URL, "");
+                    case ORIGIN_RESOURCE -> m.put(SerializedField.ORIGIN_NULL_RESOURCE, "");
+                    case ORIGIN_COMMENTS -> m.put(SerializedField.ORIGIN_NULL_COMMENTS, "");
+                    case ORIGIN_NULL_URL, ORIGIN_NULL_RESOURCE, ORIGIN_NULL_COMMENTS ->
+                            throw new ConfigException.BugOrBroken("computing delta, base object should not contain " + f + " "
+                                    + base);
+                    case END_MARKER, ROOT_VALUE, ROOT_WAS_CONFIG, UNKNOWN, VALUE_DATA, VALUE_ORIGIN ->
+                            throw new ConfigException.BugOrBroken("should not appear here: " + f);
                 }
             } else {
                 // field is in base and child, but differs, so leave it
@@ -511,9 +302,9 @@ final class SimpleConfigOrigin implements ConfigOrigin {
     }
 
     static Map<SerializedField, Object> applyFieldsDelta(Map<SerializedField, Object> base,
-            Map<SerializedField, Object> delta) throws IOException {
+                                                         Map<SerializedField, Object> delta) throws IOException {
 
-        Map<SerializedField, Object> m = new EnumMap<SerializedField, Object>(delta);
+        Map<SerializedField, Object> m = new EnumMap<>(delta);
 
         for (Map.Entry<SerializedField, Object> baseEntry : base.entrySet()) {
             SerializedField f = baseEntry.getKey();
@@ -524,50 +315,36 @@ final class SimpleConfigOrigin implements ConfigOrigin {
                 // base has the key and delta does not.
                 // we inherit from base unless a "NULL" key blocks.
                 switch (f) {
-                case ORIGIN_DESCRIPTION:
-                    m.put(f, base.get(f));
-                    break;
-                case ORIGIN_URL:
-                    if (delta.containsKey(SerializedField.ORIGIN_NULL_URL)) {
-                        m.remove(SerializedField.ORIGIN_NULL_URL);
-                    } else {
-                        m.put(f, base.get(f));
+                    case ORIGIN_DESCRIPTION -> m.put(f, base.get(f));
+                    case ORIGIN_URL -> {
+                        if (delta.containsKey(SerializedField.ORIGIN_NULL_URL)) {
+                            m.remove(SerializedField.ORIGIN_NULL_URL);
+                        } else {
+                            m.put(f, base.get(f));
+                        }
                     }
-                    break;
-                case ORIGIN_RESOURCE:
-                    if (delta.containsKey(SerializedField.ORIGIN_NULL_RESOURCE)) {
-                        m.remove(SerializedField.ORIGIN_NULL_RESOURCE);
-                    } else {
-                        m.put(f, base.get(f));
+                    case ORIGIN_RESOURCE -> {
+                        if (delta.containsKey(SerializedField.ORIGIN_NULL_RESOURCE)) {
+                            m.remove(SerializedField.ORIGIN_NULL_RESOURCE);
+                        } else {
+                            m.put(f, base.get(f));
+                        }
                     }
-                    break;
-                case ORIGIN_COMMENTS:
-                    if (delta.containsKey(SerializedField.ORIGIN_NULL_COMMENTS)) {
-                        m.remove(SerializedField.ORIGIN_NULL_COMMENTS);
-                    } else {
-                        m.put(f, base.get(f));
+                    case ORIGIN_COMMENTS -> {
+                        if (delta.containsKey(SerializedField.ORIGIN_NULL_COMMENTS)) {
+                            m.remove(SerializedField.ORIGIN_NULL_COMMENTS);
+                        } else {
+                            m.put(f, base.get(f));
+                        }
                     }
-                    break;
-                case ORIGIN_NULL_URL: // FALL THRU
-                case ORIGIN_NULL_RESOURCE: // FALL THRU
-                case ORIGIN_NULL_COMMENTS: // FALL THRU
-                    // base objects shouldn't contain these, should just
-                    // lack the field. these are only in deltas.
-                    throw new ConfigException.BugOrBroken("applying fields, base object should not contain " + f + " "
-                            + base);
-                case ORIGIN_END_LINE_NUMBER: // FALL THRU
-                case ORIGIN_LINE_NUMBER: // FALL THRU
-                case ORIGIN_TYPE:
-                    m.put(f, base.get(f));
-                    break;
-
-                case END_MARKER:
-                case ROOT_VALUE:
-                case ROOT_WAS_CONFIG:
-                case UNKNOWN:
-                case VALUE_DATA:
-                case VALUE_ORIGIN:
-                    throw new ConfigException.BugOrBroken("should not appear here: " + f);
+                    case ORIGIN_NULL_URL, ORIGIN_NULL_RESOURCE, ORIGIN_NULL_COMMENTS -> // FALL THRU
+                        // base objects shouldn't contain these, should just
+                        // lack the field. these are only in deltas.
+                            throw new ConfigException.BugOrBroken("applying fields, base object should not contain " + f + " "
+                                    + base);
+                    case ORIGIN_END_LINE_NUMBER, ORIGIN_LINE_NUMBER, ORIGIN_TYPE -> m.put(f, base.get(f));
+                    case END_MARKER, ROOT_VALUE, ROOT_WAS_CONFIG, UNKNOWN, VALUE_DATA, VALUE_ORIGIN ->
+                            throw new ConfigException.BugOrBroken("should not appear here: " + f);
                 }
             }
         }
@@ -580,8 +357,189 @@ final class SimpleConfigOrigin implements ConfigOrigin {
         if (baseOrigin != null)
             baseFields = baseOrigin.toFields();
         else
-            baseFields = Collections.<SerializedField, Object> emptyMap();
+            baseFields = Collections.emptyMap();
         Map<SerializedField, Object> fields = applyFieldsDelta(baseFields, delta);
         return fromFields(fields);
+    }
+
+    @Override
+    public SimpleConfigOrigin withLineNumber(int lineNumber) {
+        if (lineNumber == this.lineNumber && lineNumber == this.endLineNumber) {
+            return this;
+        } else {
+            return new SimpleConfigOrigin(this.description, lineNumber, lineNumber, this.originType, this.urlOrNull,
+                    this.resourceOrNull, this.commentsOrNull);
+        }
+    }
+
+    SimpleConfigOrigin addURI(URI url) {
+        return new SimpleConfigOrigin(this.description, this.lineNumber, this.endLineNumber, this.originType,
+                url != null ? url.toASCIIString() : null, this.resourceOrNull, this.commentsOrNull);
+    }
+
+    @Override
+    public SimpleConfigOrigin withComments(List<String> comments) {
+        if (ConfigImplUtil.equalsHandlingNull(comments, this.commentsOrNull)) {
+            return this;
+        } else {
+            return new SimpleConfigOrigin(this.description, this.lineNumber, this.endLineNumber, this.originType,
+                    this.urlOrNull, this.resourceOrNull, comments);
+        }
+    }
+
+    SimpleConfigOrigin prependComments(List<String> comments) {
+        if (ConfigImplUtil.equalsHandlingNull(comments, this.commentsOrNull) || comments == null) {
+            return this;
+        } else if (this.commentsOrNull == null) {
+            return withComments(comments);
+        } else {
+            List<String> merged = new ArrayList<>(comments.size() + this.commentsOrNull.size());
+            merged.addAll(comments);
+            merged.addAll(this.commentsOrNull);
+            return withComments(merged);
+        }
+    }
+
+    SimpleConfigOrigin appendComments(List<String> comments) {
+        if (ConfigImplUtil.equalsHandlingNull(comments, this.commentsOrNull) || comments == null) {
+            return this;
+        } else if (this.commentsOrNull == null) {
+            return withComments(comments);
+        } else {
+            List<String> merged = new ArrayList<>(comments.size() + this.commentsOrNull.size());
+            merged.addAll(this.commentsOrNull);
+            merged.addAll(comments);
+            return withComments(merged);
+        }
+    }
+
+    @Override
+    public String description() {
+        if (lineNumber < 0) {
+            return description;
+        } else if (endLineNumber == lineNumber) {
+            return description + ": " + lineNumber;
+        } else {
+            return description + ": " + lineNumber + "-" + endLineNumber;
+        }
+    }
+
+    OriginType originType() {
+        return originType;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (other instanceof SimpleConfigOrigin otherOrigin) {
+
+            return this.description.equals(otherOrigin.description) && this.lineNumber == otherOrigin.lineNumber
+                    && this.endLineNumber == otherOrigin.endLineNumber && this.originType == otherOrigin.originType
+                    && ConfigImplUtil.equalsHandlingNull(this.urlOrNull, otherOrigin.urlOrNull)
+                    && ConfigImplUtil.equalsHandlingNull(this.resourceOrNull, otherOrigin.resourceOrNull);
+        } else {
+            return false;
+        }
+    }
+
+    @Override
+    public int hashCode() {
+        int h = 41 * (41 + description.hashCode());
+        h = 41 * (h + lineNumber);
+        h = 41 * (h + endLineNumber);
+        h = 41 * (h + originType.hashCode());
+        if (urlOrNull != null)
+            h = 41 * (h + urlOrNull.hashCode());
+        if (resourceOrNull != null)
+            h = 41 * (h + resourceOrNull.hashCode());
+        return h;
+    }
+
+    @Override
+    public String toString() {
+        return "ConfigOrigin(" + description + ")";
+    }
+
+    @Override
+    public String filename() {
+        if (originType == OriginType.FILE) {
+            return description;
+        } else if (urlOrNull != null) {
+            URI url;
+            try {
+                url = new URL(urlOrNull).toURI();
+            } catch (Exception e) {
+                return null;
+            }
+            if (url.getScheme() != null && url.getScheme().equals("file")) {
+                return url.getPath();
+            } else {
+                return null;
+            }
+        } else {
+            return null;
+        }
+    }
+
+    @Override
+    public URI uri() {
+        if (urlOrNull == null) {
+            return null;
+        } else {
+            try {
+                return new URI(urlOrNull);
+            } catch (URISyntaxException e) {
+                return null;
+            }
+        }
+    }
+
+    @Override
+    public String resource() {
+        return resourceOrNull;
+    }
+
+    @Override
+    public int lineNumber() {
+        return lineNumber;
+    }
+
+    @Override
+    public List<String> comments() {
+        if (commentsOrNull != null) {
+            return Collections.unmodifiableList(commentsOrNull);
+        } else {
+            return Collections.emptyList();
+        }
+    }
+
+    Map<SerializedField, Object> toFields() {
+        Map<SerializedField, Object> m = new EnumMap<>(SerializedField.class);
+
+        m.put(SerializedField.ORIGIN_DESCRIPTION, description);
+
+        if (lineNumber >= 0)
+            m.put(SerializedField.ORIGIN_LINE_NUMBER, lineNumber);
+        if (endLineNumber >= 0)
+            m.put(SerializedField.ORIGIN_END_LINE_NUMBER, endLineNumber);
+
+        m.put(SerializedField.ORIGIN_TYPE, originType.ordinal());
+
+        if (urlOrNull != null)
+            m.put(SerializedField.ORIGIN_URL, urlOrNull);
+        if (resourceOrNull != null)
+            m.put(SerializedField.ORIGIN_RESOURCE, resourceOrNull);
+        if (commentsOrNull != null)
+            m.put(SerializedField.ORIGIN_COMMENTS, commentsOrNull);
+
+        return m;
+    }
+
+    Map<SerializedField, Object> toFieldsDelta(SimpleConfigOrigin baseOrigin) {
+        Map<SerializedField, Object> baseFields;
+        if (baseOrigin != null)
+            baseFields = baseOrigin.toFields();
+        else
+            baseFields = Collections.emptyMap();
+        return fieldsDelta(baseFields, toFields());
     }
 }

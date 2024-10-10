@@ -4,7 +4,7 @@ package com.typesafe.config.impl;
 enum OriginType {
     GENERIC,
     FILE,
-    URL,
+    URI,
     RESOURCE,
     ENV_VARIABLE
 }

@@ -1,5 +1,5 @@
 /**
- *   Copyright (C) 2015 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2015 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
 
@@ -12,22 +12,6 @@ import java.io.StringReader;
 import java.util.*;
 
 final class PathParser {
-    static class Element {
-        StringBuilder sb;
-        // an element can be empty if it has a quoted empty string "" in it
-        boolean canBeEmpty;
-
-        Element(String initial, boolean canBeEmpty) {
-            this.canBeEmpty = canBeEmpty;
-            this.sb = new StringBuilder(initial);
-        }
-
-        @Override
-        public String toString() {
-            return "Element(" + sb.toString() + "," + canBeEmpty + ")";
-        }
-    }
-
     static ConfigOrigin apiOrigin = SimpleConfigOrigin.newSimple("path parameter");
 
     static ConfigNodeParsedPath parsePathNode(String path) {
@@ -35,15 +19,12 @@ final class PathParser {
     }
 
     static ConfigNodeParsedPath parsePathNode(String path, ConfigSyntax flavor) {
-        StringReader reader = new StringReader(path);
 
-        try {
+        try (StringReader reader = new StringReader(path)) {
             Iterator<Token> tokens = Tokenizer.tokenize(apiOrigin, reader,
                     flavor);
             tokens.next(); // drop START
             return parsePathNodeExpression(tokens, apiOrigin, path, flavor);
-        } finally {
-            reader.close();
         }
     }
 
@@ -52,20 +33,16 @@ final class PathParser {
         if (speculated != null)
             return speculated;
 
-        StringReader reader = new StringReader(path);
-
-        try {
+        try (StringReader reader = new StringReader(path)) {
             Iterator<Token> tokens = Tokenizer.tokenize(apiOrigin, reader,
                     ConfigSyntax.CONF);
             tokens.next(); // drop START
             return parsePathExpression(tokens, apiOrigin, path);
-        } finally {
-            reader.close();
         }
     }
 
     protected static Path parsePathExpression(Iterator<Token> expression,
-                                            ConfigOrigin origin) {
+                                              ConfigOrigin origin) {
         return parsePathExpression(expression, origin, null, null, ConfigSyntax.CONF);
     }
 
@@ -75,24 +52,24 @@ final class PathParser {
     }
 
     protected static ConfigNodeParsedPath parsePathNodeExpression(Iterator<Token> expression,
-                                                            ConfigOrigin origin) {
+                                                                  ConfigOrigin origin) {
         return parsePathNodeExpression(expression, origin, null, ConfigSyntax.CONF);
     }
 
     protected static ConfigNodeParsedPath parsePathNodeExpression(Iterator<Token> expression,
-                                                            ConfigOrigin origin, String originalText, ConfigSyntax flavor) {
-        ArrayList<Token> pathTokens = new ArrayList<Token>();
+                                                                  ConfigOrigin origin, String originalText, ConfigSyntax flavor) {
+        ArrayList<Token> pathTokens = new ArrayList<>();
         Path path = parsePathExpression(expression, origin, originalText, pathTokens, flavor);
         return new ConfigNodeParsedPath(path, pathTokens);
     }
 
     // originalText may be null if not available
     protected static Path parsePathExpression(Iterator<Token> expression,
-                                            ConfigOrigin origin, String originalText,
-                                            ArrayList<Token> pathTokens,
-                                            ConfigSyntax flavor) {
+                                              ConfigOrigin origin, String originalText,
+                                              ArrayList<Token> pathTokens,
+                                              ConfigSyntax flavor) {
         // each builder in "buf" is an element in the path.
-        List<Element> buf = new ArrayList<Element>();
+        List<Element> buf = new ArrayList<>();
         buf.add(new Element("", false));
 
         if (!expression.hasNext()) {
@@ -107,17 +84,17 @@ final class PathParser {
                 pathTokens.add(t);
 
             // Ignore all IgnoredWhitespace tokens
-            if (Tokens.isIgnoredWhitespace(t))
+            if (t instanceof TokenWithOrigin.IgnoredWhitespace)
                 continue;
 
-            if (Tokens.isValueWithType(t, ConfigValueType.STRING)) {
-                AbstractConfigValue v = Tokens.getValue(t);
+            if (t instanceof TokenWithOrigin.Value val && val.value().valueType() == ConfigValueType.STRING) {
+                AbstractConfigValue v = val.value();
                 // this is a quoted string; so any periods
                 // in here don't count as path separators
                 String s = v.transformToString();
 
                 addPathText(buf, true, s);
-            } else if (t == Tokens.END) {
+            } else if (t == StaticToken.END) {
                 // ignore this; when parsing a file, it should not happen
                 // since we're parsing a token list rather than the main
                 // token iterator, and when parsing a path expression from the
@@ -126,7 +103,7 @@ final class PathParser {
                 // any periods outside of a quoted string count as
                 // separators
                 String text;
-                if (Tokens.isValue(t)) {
+                if (t instanceof TokenWithOrigin.Value value) {
                     // appending a number here may add
                     // a period, but we _do_ count those as path
                     // separators, because we basically want
@@ -134,23 +111,23 @@ final class PathParser {
                     // though there's a number in it. The fact that
                     // we tokenize non-string values is largely an
                     // implementation detail.
-                    AbstractConfigValue v = Tokens.getValue(t);
+                    AbstractConfigValue v = value.value();
 
                     // We need to split the tokens on a . so that we can get sub-paths but still preserve
                     // the original path text when doing an insertion
                     if (pathTokens != null) {
-                        pathTokens.remove(pathTokens.size() - 1);
-                        pathTokens.addAll(splitTokenOnPeriod(t, flavor));
+                        pathTokens.removeLast();
+                        pathTokens.addAll(splitTokenOnPeriod(value, flavor));
                     }
                     text = v.transformToString();
-                } else if (Tokens.isUnquotedText(t)) {
+                } else if (t instanceof TokenWithOrigin.UnquotedText ut) {
                     // We need to split the tokens on a . so that we can get sub-paths but still preserve
                     // the original path text when doing an insertion on ConfigNodeObjects
                     if (pathTokens != null) {
-                        pathTokens.remove(pathTokens.size() - 1);
-                        pathTokens.addAll(splitTokenOnPeriod(t, flavor));
+                        pathTokens.removeLast();
+                        pathTokens.addAll(splitTokenOnPeriod(ut, flavor));
                     }
-                    text = Tokens.getUnquotedText(t);
+                    text = ut.value();
                 } else {
                     throw new ConfigException.BadPath(
                             origin,
@@ -166,7 +143,7 @@ final class PathParser {
 
         PathBuilder pb = new PathBuilder();
         for (Element e : buf) {
-            if (e.sb.length() == 0 && !e.canBeEmpty) {
+            if (e.sb.isEmpty() && !e.canBeEmpty) {
                 throw new ConfigException.BadPath(
                         origin,
                         originalText,
@@ -179,39 +156,39 @@ final class PathParser {
         return pb.result();
     }
 
-    private static Collection<Token> splitTokenOnPeriod(Token t, ConfigSyntax flavor) {
+    private static Collection<Token> splitTokenOnPeriod(TokenWithOrigin t, ConfigSyntax flavor) {
         String tokenText = t.tokenText();
         if (tokenText.equals(".")) {
             return Collections.singletonList(t);
         }
         String[] splitToken = tokenText.split("\\.");
-        ArrayList<Token> splitTokens = new ArrayList<Token>();
+        ArrayList<Token> splitTokens = new ArrayList<>();
         for (String s : splitToken) {
             if (flavor == ConfigSyntax.CONF)
-                splitTokens.add(Tokens.newUnquotedText(t.origin(), s));
+                splitTokens.add(new TokenWithOrigin.UnquotedText(t.origin(), s));
             else
-                splitTokens.add(Tokens.newString(t.origin(), s, "\"" + s + "\""));
-            splitTokens.add(Tokens.newUnquotedText(t.origin(), "."));
+                splitTokens.add(TokenWithOrigin.Value.newString(t.origin(), s, "\"" + s + "\""));
+            splitTokens.add(new TokenWithOrigin.UnquotedText(t.origin(), "."));
         }
         if (tokenText.charAt(tokenText.length() - 1) != '.')
-            splitTokens.remove(splitTokens.size() - 1);
+            splitTokens.removeLast();
         return splitTokens;
     }
 
     private static void addPathText(List<Element> buf, boolean wasQuoted,
                                     String newText) {
         int i = wasQuoted ? -1 : newText.indexOf('.');
-        Element current = buf.get(buf.size() - 1);
+        Element current = buf.getLast();
         if (i < 0) {
             // add to current path element
             current.sb.append(newText);
             // any empty quoted string means this element can
             // now be empty.
-            if (wasQuoted && current.sb.length() == 0)
+            if (wasQuoted && current.sb.isEmpty())
                 current.canBeEmpty = true;
         } else {
             // "buf" plus up to the period is an element
-            current.sb.append(newText.substring(0, i));
+            current.sb.append(newText, 0, i);
             // then start a new element
             buf.add(new Element("", false));
             // recurse to consume remainder of newText
@@ -249,10 +226,7 @@ final class PathParser {
             }
         }
 
-        if (lastWasDot)
-            return true;
-
-        return false;
+        return lastWasDot;
     }
 
     private static Path fastPathBuild(Path tail, String s, int end) {
@@ -275,5 +249,21 @@ final class PathParser {
             return null;
 
         return fastPathBuild(null, s, s.length());
+    }
+
+    static class Element {
+        StringBuilder sb;
+        // an element can be empty if it has a quoted empty string "" in it
+        boolean canBeEmpty;
+
+        Element(String initial, boolean canBeEmpty) {
+            this.canBeEmpty = canBeEmpty;
+            this.sb = new StringBuilder(initial);
+        }
+
+        @Override
+        public String toString() {
+            return "Element(" + sb.toString() + "," + canBeEmpty + ")";
+        }
     }
 }

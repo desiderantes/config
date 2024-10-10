@@ -1,34 +1,12 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInput;
-import java.io.DataInputStream;
-import java.io.DataOutput;
-import java.io.DataOutputStream;
-import java.io.Externalizable;
-import java.io.IOException;
-import java.io.NotSerializableException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
-import java.io.ObjectStreamException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.typesafe.config.*;
 
-import com.typesafe.config.Config;
-import com.typesafe.config.ConfigException;
-import com.typesafe.config.ConfigList;
-import com.typesafe.config.ConfigObject;
-import com.typesafe.config.ConfigOrigin;
-import com.typesafe.config.ConfigValue;
-import com.typesafe.config.ConfigValueType;
+import java.io.*;
+import java.util.*;
 
 /**
  * Deliberately shoving all the serialization code into this class instead of
@@ -41,89 +19,10 @@ class SerializedConfigValue extends AbstractConfigValue implements Externalizabl
 
     // this is the version used by Java serialization, if it increments it's
     // essentially an ABI break and bad
+    @Serial
     private static final long serialVersionUID = 1L;
-
-    // this is how we try to be extensible
-    static enum SerializedField {
-        // represents a field code we didn't recognize
-        UNKNOWN,
-
-        // end of a list of fields
-        END_MARKER,
-
-        // Fields at the root
-        ROOT_VALUE,
-        ROOT_WAS_CONFIG,
-
-        // Fields that make up a value
-        VALUE_DATA,
-        VALUE_ORIGIN,
-
-        // Fields that make up an origin
-        ORIGIN_DESCRIPTION,
-        ORIGIN_LINE_NUMBER,
-        ORIGIN_END_LINE_NUMBER,
-        ORIGIN_TYPE,
-        ORIGIN_URL,
-        ORIGIN_COMMENTS,
-        ORIGIN_NULL_URL,
-        ORIGIN_NULL_COMMENTS,
-        ORIGIN_RESOURCE,
-        ORIGIN_NULL_RESOURCE;
-
-        static SerializedField forInt(int b) {
-            if (b < values().length)
-                return values()[b];
-            else
-                return UNKNOWN;
-        }
-    };
-
-    private static enum SerializedValueType {
-        // the ordinals here are in the wire format, caution
-        NULL(ConfigValueType.NULL),
-        BOOLEAN(ConfigValueType.BOOLEAN),
-        INT(ConfigValueType.NUMBER),
-        LONG(ConfigValueType.NUMBER),
-        DOUBLE(ConfigValueType.NUMBER),
-        STRING(ConfigValueType.STRING),
-        LIST(ConfigValueType.LIST),
-        OBJECT(ConfigValueType.OBJECT);
-
-        ConfigValueType configType;
-
-        SerializedValueType(ConfigValueType configType) {
-            this.configType = configType;
-        }
-
-        static SerializedValueType forInt(int b) {
-            if (b < values().length)
-                return values()[b];
-            else
-                return null;
-        }
-
-        static SerializedValueType forValue(ConfigValue value) {
-            ConfigValueType t = value.valueType();
-            if (t == ConfigValueType.NUMBER) {
-                if (value instanceof ConfigInt)
-                    return INT;
-                else if (value instanceof ConfigLong)
-                    return LONG;
-                else if (value instanceof ConfigDouble)
-                    return DOUBLE;
-            } else {
-                for (SerializedValueType st : values()) {
-                    if (st.configType == t)
-                        return st;
-                }
-            }
-
-            throw new ConfigException.BugOrBroken("don't know how to serialize " + value);
-        }
-    };
-
     private ConfigValue value;
+
     private boolean wasConfig;
 
     // this has to be public for the Java deserializer
@@ -142,72 +41,33 @@ class SerializedConfigValue extends AbstractConfigValue implements Externalizabl
         this.wasConfig = true;
     }
 
-    // when Java deserializer reads this object, return the contained
-    // object instead.
-    private Object readResolve() throws ObjectStreamException {
-        if (wasConfig)
-            return ((ConfigObject) value).toConfig();
-        else
-            return value;
-    }
-
-    private static class FieldOut {
-        final SerializedField code;
-        final ByteArrayOutputStream bytes;
-        final DataOutput data;
-
-        FieldOut(SerializedField code) {
-            this.code = code;
-            this.bytes = new ByteArrayOutputStream();
-            this.data = new DataOutputStream(bytes);
-        }
-    }
-
     // this is a separate function to prevent bugs writing to the
     // outer stream instead of field.data
     private static void writeOriginField(DataOutput out, SerializedField code, Object v)
             throws IOException {
         switch (code) {
-        case ORIGIN_DESCRIPTION:
-            out.writeUTF((String) v);
-            break;
-        case ORIGIN_LINE_NUMBER:
-            out.writeInt((Integer) v);
-            break;
-        case ORIGIN_END_LINE_NUMBER:
-            out.writeInt((Integer) v);
-            break;
-        case ORIGIN_TYPE:
-            out.writeByte((Integer) v);
-            break;
-        case ORIGIN_URL:
-            out.writeUTF((String) v);
-            break;
-        case ORIGIN_RESOURCE:
-            out.writeUTF((String) v);
-            break;
-        case ORIGIN_COMMENTS:
-            @SuppressWarnings("unchecked")
-            List<String> list = (List<String>) v;
-            int size = list.size();
-            out.writeInt(size);
-            for (String s : list) {
-                out.writeUTF(s);
+            case ORIGIN_DESCRIPTION, ORIGIN_URL, ORIGIN_RESOURCE -> out.writeUTF((String) v);
+            case ORIGIN_LINE_NUMBER, ORIGIN_END_LINE_NUMBER -> out.writeInt((Integer) v);
+            case ORIGIN_TYPE -> out.writeByte((Integer) v);
+            case ORIGIN_COMMENTS -> {
+                @SuppressWarnings("unchecked")
+                List<String> list = (List<String>) v;
+                int size = list.size();
+                out.writeInt(size);
+                for (String s : list) {
+                    out.writeUTF(s);
+                }
             }
-            break;
-        case ORIGIN_NULL_URL: // FALL THRU
-        case ORIGIN_NULL_RESOURCE: // FALL THRU
-        case ORIGIN_NULL_COMMENTS:
-            // nothing to write out besides code and length
-            break;
-        default:
-            throw new IOException("Unhandled field from origin: " + code);
+            case ORIGIN_NULL_URL, ORIGIN_NULL_RESOURCE, ORIGIN_NULL_COMMENTS -> {
+                // nothing to write out besides code and length
+            }
+            default -> throw new IOException("Unhandled field from origin: " + code);
         }
     }
 
     // not private because we use it to serialize ConfigException
     static void writeOrigin(DataOutput out, SimpleConfigOrigin origin,
-            SimpleConfigOrigin baseOrigin) throws IOException {
+                            SimpleConfigOrigin baseOrigin) throws IOException {
         Map<SerializedField, Object> m;
         // to serialize a null origin, we write out no fields at all
         if (origin != null)
@@ -226,62 +86,47 @@ class SerializedConfigValue extends AbstractConfigValue implements Externalizabl
     // not private because we use it to deserialize ConfigException
     static SimpleConfigOrigin readOrigin(DataInput in, SimpleConfigOrigin baseOrigin)
             throws IOException {
-        Map<SerializedField, Object> m = new EnumMap<SerializedField, Object>(SerializedField.class);
+        Map<SerializedField, Object> m = new EnumMap<>(SerializedField.class);
         while (true) {
             Object v = null;
             SerializedField field = readCode(in);
             switch (field) {
-            case END_MARKER:
-                return SimpleConfigOrigin.fromBase(baseOrigin, m);
-            case ORIGIN_DESCRIPTION:
-                in.readInt(); // discard length
-                v = in.readUTF();
-                break;
-            case ORIGIN_LINE_NUMBER:
-                in.readInt(); // discard length
-                v = in.readInt();
-                break;
-            case ORIGIN_END_LINE_NUMBER:
-                in.readInt(); // discard length
-                v = in.readInt();
-                break;
-            case ORIGIN_TYPE:
-                in.readInt(); // discard length
-                v = in.readUnsignedByte();
-                break;
-            case ORIGIN_URL:
-                in.readInt(); // discard length
-                v = in.readUTF();
-                break;
-            case ORIGIN_RESOURCE:
-                in.readInt(); // discard length
-                v = in.readUTF();
-                break;
-            case ORIGIN_COMMENTS:
-                in.readInt(); // discard length
-                int size = in.readInt();
-                List<String> list = new ArrayList<String>(size);
-                for (int i = 0; i < size; ++i) {
-                    list.add(in.readUTF());
+                case END_MARKER -> {
+                    return SimpleConfigOrigin.fromBase(baseOrigin, m);
                 }
-                v = list;
-                break;
-            case ORIGIN_NULL_URL: // FALL THRU
-            case ORIGIN_NULL_RESOURCE: // FALL THRU
-            case ORIGIN_NULL_COMMENTS:
-                // nothing to read besides code and length
-                in.readInt(); // discard length
-                v = ""; // just something non-null to put in the map
-                break;
-            case ROOT_VALUE:
-            case ROOT_WAS_CONFIG:
-            case VALUE_DATA:
-            case VALUE_ORIGIN:
-                throw new IOException("Not expecting this field here: " + field);
-            case UNKNOWN:
-                // skip unknown field
-                skipField(in);
-                break;
+                case ORIGIN_DESCRIPTION, ORIGIN_URL, ORIGIN_RESOURCE -> {
+                    in.readInt(); // discard length
+                    v = in.readUTF();
+                }
+                case ORIGIN_LINE_NUMBER, ORIGIN_END_LINE_NUMBER -> {
+                    in.readInt(); // discard length
+                    v = in.readInt();
+                }
+                case ORIGIN_TYPE -> {
+                    in.readInt(); // discard length
+                    v = in.readUnsignedByte();
+                }
+                case ORIGIN_COMMENTS -> {
+                    in.readInt(); // discard length
+                    int size = in.readInt();
+                    List<String> list = new ArrayList<String>(size);
+                    for (int i = 0; i < size; ++i) {
+                        list.add(in.readUTF());
+                    }
+                    v = list;
+                } // FALL THRU
+                // FALL THRU
+                case ORIGIN_NULL_URL, ORIGIN_NULL_RESOURCE, ORIGIN_NULL_COMMENTS -> {
+                    // nothing to read besides code and length
+                    in.readInt(); // discard length
+                    v = ""; // just something non-null to put in the map
+                }
+                case ROOT_VALUE, ROOT_WAS_CONFIG, VALUE_DATA, VALUE_ORIGIN ->
+                        throw new IOException("Not expecting this field here: " + field);
+                case UNKNOWN -> {
+                    // skip unknown field
+                    skipField(in);
+                }
             }
             if (v != null)
                 m.put(field, v);
@@ -292,42 +137,42 @@ class SerializedConfigValue extends AbstractConfigValue implements Externalizabl
         SerializedValueType st = SerializedValueType.forValue(value);
         out.writeByte(st.ordinal());
         switch (st) {
-        case BOOLEAN:
-            out.writeBoolean(((ConfigBoolean) value).unwrapped());
-            break;
-        case NULL:
-            break;
-        case INT:
-            // saving numbers as both string and binary is redundant but easy
-            out.writeInt(((ConfigInt) value).unwrapped());
-            out.writeUTF(((ConfigNumber) value).transformToString());
-            break;
-        case LONG:
-            out.writeLong(((ConfigLong) value).unwrapped());
-            out.writeUTF(((ConfigNumber) value).transformToString());
-            break;
-        case DOUBLE:
-            out.writeDouble(((ConfigDouble) value).unwrapped());
-            out.writeUTF(((ConfigNumber) value).transformToString());
-            break;
-        case STRING:
-            out.writeUTF(((ConfigString) value).unwrapped());
-            break;
-        case LIST:
-            ConfigList list = (ConfigList) value;
-            out.writeInt(list.size());
-            for (ConfigValue v : list) {
-                writeValue(out, v, (SimpleConfigOrigin) list.origin());
-            }
-            break;
-        case OBJECT:
-            ConfigObject obj = (ConfigObject) value;
-            out.writeInt(obj.size());
-            for (Map.Entry<String, ConfigValue> e : obj.entrySet()) {
-                out.writeUTF(e.getKey());
-                writeValue(out, e.getValue(), (SimpleConfigOrigin) obj.origin());
-            }
-            break;
+            case BOOLEAN:
+                out.writeBoolean(((ConfigBoolean) value).unwrapped());
+                break;
+            case NULL:
+                break;
+            case INT:
+                // saving numbers as both string and binary is redundant but easy
+                out.writeInt(((ConfigInt) value).unwrapped());
+                out.writeUTF(((ConfigNumber) value).transformToString());
+                break;
+            case LONG:
+                out.writeLong(((ConfigLong) value).unwrapped());
+                out.writeUTF(((ConfigNumber) value).transformToString());
+                break;
+            case DOUBLE:
+                out.writeDouble(((ConfigDouble) value).unwrapped());
+                out.writeUTF(((ConfigNumber) value).transformToString());
+                break;
+            case STRING:
+                out.writeUTF(((ConfigString) value).unwrapped());
+                break;
+            case LIST:
+                ConfigList list = (ConfigList) value;
+                out.writeInt(list.size());
+                for (ConfigValue v : list) {
+                    writeValue(out, v, (SimpleConfigOrigin) list.origin());
+                }
+                break;
+            case OBJECT:
+                ConfigObject obj = (ConfigObject) value;
+                out.writeInt(obj.size());
+                for (Map.Entry<String, ConfigValue> e : obj.entrySet()) {
+                    out.writeUTF(e.getKey());
+                    writeValue(out, e.getValue(), (SimpleConfigOrigin) obj.origin());
+                }
+                break;
         }
     }
 
@@ -338,41 +183,41 @@ class SerializedConfigValue extends AbstractConfigValue implements Externalizabl
         if (st == null)
             throw new IOException("Unknown serialized value type: " + stb);
         switch (st) {
-        case BOOLEAN:
-            return new ConfigBoolean(origin, in.readBoolean());
-        case NULL:
-            return new ConfigNull(origin);
-        case INT:
-            int vi = in.readInt();
-            String si = in.readUTF();
-            return new ConfigInt(origin, vi, si);
-        case LONG:
-            long vl = in.readLong();
-            String sl = in.readUTF();
-            return new ConfigLong(origin, vl, sl);
-        case DOUBLE:
-            double vd = in.readDouble();
-            String sd = in.readUTF();
-            return new ConfigDouble(origin, vd, sd);
-        case STRING:
-            return new ConfigString.Quoted(origin, in.readUTF());
-        case LIST:
-            int listSize = in.readInt();
-            List<AbstractConfigValue> list = new ArrayList<AbstractConfigValue>(listSize);
-            for (int i = 0; i < listSize; ++i) {
-                AbstractConfigValue v = readValue(in, origin);
-                list.add(v);
-            }
-            return new SimpleConfigList(origin, list);
-        case OBJECT:
-            int mapSize = in.readInt();
-            Map<String, AbstractConfigValue> map = new HashMap<String, AbstractConfigValue>(mapSize);
-            for (int i = 0; i < mapSize; ++i) {
-                String key = in.readUTF();
-                AbstractConfigValue v = readValue(in, origin);
-                map.put(key, v);
-            }
-            return new SimpleConfigObject(origin, map);
+            case BOOLEAN:
+                return new ConfigBoolean(origin, in.readBoolean());
+            case NULL:
+                return new ConfigNull(origin);
+            case INT:
+                int vi = in.readInt();
+                String si = in.readUTF();
+                return new ConfigInt(origin, vi, si);
+            case LONG:
+                long vl = in.readLong();
+                String sl = in.readUTF();
+                return new ConfigLong(origin, vl, sl);
+            case DOUBLE:
+                double vd = in.readDouble();
+                String sd = in.readUTF();
+                return new ConfigDouble(origin, vd, sd);
+            case STRING:
+                return new ConfigString.Quoted(origin, in.readUTF());
+            case LIST:
+                int listSize = in.readInt();
+                List<AbstractConfigValue> list = new ArrayList<>(listSize);
+                for (int i = 0; i < listSize; ++i) {
+                    AbstractConfigValue v = readValue(in, origin);
+                    list.add(v);
+                }
+                return new SimpleConfigList(origin, list);
+            case OBJECT:
+                int mapSize = in.readInt();
+                Map<String, AbstractConfigValue> map = new HashMap<>(mapSize);
+                for (int i = 0; i < mapSize; ++i) {
+                    String key = in.readUTF();
+                    AbstractConfigValue v = readValue(in, origin);
+                    map.put(key, v);
+                }
+                return new SimpleConfigObject(origin, map);
         }
         throw new IOException("Unhandled serialized value type: " + st);
     }
@@ -445,6 +290,21 @@ class SerializedConfigValue extends AbstractConfigValue implements Externalizabl
         }
     }
 
+    private static ConfigException shouldNotBeUsed() {
+        return new ConfigException.BugOrBroken(SerializedConfigValue.class.getName()
+                + " should not exist outside of serialization");
+    }
+
+    // when Java deserializer reads this object, return the contained
+    // object instead.
+    @Serial
+    private Object readResolve() throws ObjectStreamException {
+        if (wasConfig)
+            return ((ConfigObject) value).toConfig();
+        else
+            return value;
+    }
+
     @Override
     public void writeExternal(ObjectOutput out) throws IOException {
         if (((AbstractConfigValue) value).resolveStatus() != ResolveStatus.RESOLVED)
@@ -468,7 +328,7 @@ class SerializedConfigValue extends AbstractConfigValue implements Externalizabl
             if (code == SerializedField.END_MARKER) {
                 return;
             }
-            
+
             DataInput input = fieldIn(in);
             if (code == SerializedField.ROOT_VALUE) {
                 this.value = readValue(input, null /* baseOrigin */);
@@ -482,11 +342,6 @@ class SerializedConfigValue extends AbstractConfigValue implements Externalizabl
         byte[] bytes = new byte[in.readInt()];
         in.readFully(bytes);
         return new DataInputStream(new ByteArrayInputStream(bytes));
-    }
-
-    private static ConfigException shouldNotBeUsed() {
-        return new ConfigException.BugOrBroken(SerializedConfigValue.class.getName()
-                + " should not exist outside of serialization");
     }
 
     @Override
@@ -518,8 +373,8 @@ class SerializedConfigValue extends AbstractConfigValue implements Externalizabl
         // contract of java.lang.Object
         if (other instanceof SerializedConfigValue) {
             return canEqual(other)
-                && (this.wasConfig == ((SerializedConfigValue) other).wasConfig)
-                && (this.value.equals(((SerializedConfigValue) other).value));
+                    && (this.wasConfig == ((SerializedConfigValue) other).wasConfig)
+                    && (this.value.equals(((SerializedConfigValue) other).value));
         } else {
             return false;
         }
@@ -530,5 +385,104 @@ class SerializedConfigValue extends AbstractConfigValue implements Externalizabl
         int h = 41 * (41 + value.hashCode());
         h = 41 * (h + (wasConfig ? 1 : 0));
         return h;
+    }
+
+    // this is how we try to be extensible
+    enum SerializedField {
+        // represents a field code we didn't recognize
+        UNKNOWN,
+
+        // end of a list of fields
+        END_MARKER,
+
+        // Fields at the root
+        ROOT_VALUE,
+        ROOT_WAS_CONFIG,
+
+        // Fields that make up a value
+        VALUE_DATA,
+        VALUE_ORIGIN,
+
+        // Fields that make up an origin
+        ORIGIN_DESCRIPTION,
+        ORIGIN_LINE_NUMBER,
+        ORIGIN_END_LINE_NUMBER,
+        ORIGIN_TYPE,
+        ORIGIN_URL,
+        ORIGIN_COMMENTS,
+        ORIGIN_NULL_URL,
+        ORIGIN_NULL_COMMENTS,
+        ORIGIN_RESOURCE,
+        ORIGIN_NULL_RESOURCE;
+
+        static SerializedField forInt(int b) {
+            if (b < values().length)
+                return values()[b];
+            else
+                return UNKNOWN;
+        }
+    }
+
+    private enum SerializedValueType {
+        // the ordinals here are in the wire format, caution
+        NULL(ConfigValueType.NULL),
+        BOOLEAN(ConfigValueType.BOOLEAN),
+        INT(ConfigValueType.NUMBER),
+        LONG(ConfigValueType.NUMBER),
+        DOUBLE(ConfigValueType.NUMBER),
+        STRING(ConfigValueType.STRING),
+        LIST(ConfigValueType.LIST),
+        OBJECT(ConfigValueType.OBJECT);
+
+        final ConfigValueType configType;
+
+        SerializedValueType(ConfigValueType configType) {
+            this.configType = configType;
+        }
+
+        static SerializedValueType forInt(int b) {
+            if (b < values().length)
+                return values()[b];
+            else
+                return null;
+        }
+
+        static SerializedValueType forValue(ConfigValue value) {
+            ConfigValueType t = value.valueType();
+            if (t == ConfigValueType.NUMBER) {
+                switch (value) {
+                    case ConfigInt configInt -> {
+                        return INT;
+                    }
+                    case ConfigLong configLong -> {
+                        return LONG;
+                    }
+                    case ConfigDouble configDouble -> {
+                        return DOUBLE;
+                    }
+                    default -> {
+                    }
+                }
+            } else {
+                for (SerializedValueType st : values()) {
+                    if (st.configType == t)
+                        return st;
+                }
+            }
+
+            throw new ConfigException.BugOrBroken("don't know how to serialize " + value);
+        }
+    }
+
+    private static class FieldOut {
+        final SerializedField code;
+        final ByteArrayOutputStream bytes;
+        final DataOutput data;
+
+        FieldOut(SerializedField code) {
+            this.code = code;
+            this.bytes = new ByteArrayOutputStream();
+            this.data = new DataOutputStream(bytes);
+        }
     }
 }

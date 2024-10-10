@@ -1,49 +1,75 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
 
-import java.util.*;
-
 import com.typesafe.config.ConfigException;
 
-final class Path {
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Stream;
 
-    final private String first;
-    final private Path remainder;
+record Path(
+        String first,
+        Path remainder
+) {
 
-    Path(String first, Path remainder) {
-        this.first = first;
-        this.remainder = remainder;
+    // this doesn't have a very precise meaning, just to reduce
+    // noise from quotes in the rendered path for average cases
+    static boolean hasFunkyChars(String s) {
+        int length = s.length();
+
+        if (length == 0)
+            return false;
+
+        for (int i = 0; i < length; ++i) {
+            char c = s.charAt(i);
+
+            if (Character.isLetterOrDigit(c) || c == '-' || c == '_')
+                continue;
+            else
+                return true;
+        }
+        return false;
     }
 
-    Path(String... elements) {
+    static Path newKey(String key) {
+        return new Path(key, null);
+    }
+
+    static Path newPath(String path) {
+        return PathParser.parsePath(path);
+    }
+
+    static Path of(String... elements) {
         if (elements.length == 0)
             throw new ConfigException.BugOrBroken("empty path");
-        this.first = elements[0];
+        var first = elements[0];
+        Path remainder = null;
         if (elements.length > 1) {
             PathBuilder pb = new PathBuilder();
             for (int i = 1; i < elements.length; ++i) {
                 pb.appendKey(elements[i]);
             }
-            this.remainder = pb.result();
-        } else {
-            this.remainder = null;
+            remainder = pb.result();
         }
+
+        return new Path(first, remainder);
     }
 
     // append all the paths in the list together into one path
-    Path(List<Path> pathsToConcat) {
-        this(pathsToConcat.iterator());
+    static Path of(List<Path> pathsToConcat) {
+        return Path.of(pathsToConcat.iterator());
     }
 
     // append all the paths in the iterator together into one path
-    Path(Iterator<Path> i) {
+    static Path of(Iterator<Path> i) {
         if (!i.hasNext())
             throw new ConfigException.BugOrBroken("empty path");
 
         Path firstPath = i.next();
-        this.first = firstPath.first;
+        var first = firstPath.first;
 
         PathBuilder pb = new PathBuilder();
         if (firstPath.remainder != null) {
@@ -52,23 +78,12 @@ final class Path {
         while (i.hasNext()) {
             pb.appendPath(i.next());
         }
-        this.remainder = pb.result();
-    }
+        var remainder = pb.result();
 
-    String first() {
-        return first;
-    }
-
-    /**
-     *
-     * @return path minus the first element or null if no more elements
-     */
-    Path remainder() {
-        return remainder;
+        return new Path(first, remainder);
     }
 
     /**
-     *
      * @return path minus the last element or null if we have just one element
      */
     Path parent() {
@@ -85,7 +100,6 @@ final class Path {
     }
 
     /**
-     *
      * @return last element in the path
      */
     String last() {
@@ -144,7 +158,7 @@ final class Path {
         Path myRemainder = this;
         Path otherRemainder = other;
         if (otherRemainder.length() <= myRemainder.length()) {
-            while(otherRemainder != null) {
+            while (otherRemainder != null) {
                 if (!otherRemainder.first().equals(myRemainder.first()))
                     return false;
                 myRemainder = myRemainder.remainder();
@@ -157,11 +171,10 @@ final class Path {
 
     @Override
     public boolean equals(Object other) {
-        if (other instanceof Path) {
-            Path that = (Path) other;
+        if (other instanceof Path that) {
             return this.first.equals(that.first)
                     && ConfigImplUtil.equalsHandlingNull(this.remainder,
-                            that.remainder);
+                    that.remainder);
         } else {
             return false;
         }
@@ -171,25 +184,6 @@ final class Path {
     public int hashCode() {
         return 41 * (41 + first.hashCode())
                 + (remainder == null ? 0 : remainder.hashCode());
-    }
-
-    // this doesn't have a very precise meaning, just to reduce
-    // noise from quotes in the rendered path for average cases
-    static boolean hasFunkyChars(String s) {
-        int length = s.length();
-
-        if (length == 0)
-            return false;
-
-        for (int i = 0; i < length; ++i) {
-            char c = s.charAt(i);
-
-            if (Character.isLetterOrDigit(c) || c == '-' || c == '_')
-                continue;
-            else
-                return true;
-        }
-        return false;
     }
 
     private void appendToStringBuilder(StringBuilder sb) {
@@ -222,21 +216,10 @@ final class Path {
         return sb.toString();
     }
 
-    static Path newKey(String key) {
-        return new Path(key, null);
-    }
-
-    static Path newPath(String path) {
-        return PathParser.parsePath(path);
-    }
-
     public List<String> toUnmodifiableJava() {
-        List<String> ls = new LinkedList<>();
-        Path here = this;
-        while (here != null) {
-            ls.add(here.first);
-            here = here.remainder;
-        }
-        return Collections.unmodifiableList(ls);
+        return Stream.iterate(this, p -> Objects.nonNull(p.remainder), Path::remainder)
+                .map(Path::first)
+                .toList();
+
     }
 }

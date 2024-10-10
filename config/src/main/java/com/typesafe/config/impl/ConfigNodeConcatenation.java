@@ -1,8 +1,8 @@
 package com.typesafe.config.impl;
 
-import java.util.Collection;
-
 import com.typesafe.config.parser.ConfigNodeVisitor;
+
+import java.util.Collection;
 
 final class ConfigNodeConcatenation extends ConfigNodeComplexValue
         implements com.typesafe.config.parser.ConfigNodeConcatenation {

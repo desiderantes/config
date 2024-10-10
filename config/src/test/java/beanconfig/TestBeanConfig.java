@@ -2,7 +2,6 @@ package beanconfig;
 
 public class TestBeanConfig {
 
-
     private NumbersConfig numbers;
 
     public NumbersConfig getNumbers() {

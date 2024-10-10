@@ -23,10 +23,9 @@ public class StringsConfig {
 
     @Override
     public boolean equals(Object o) {
-        if (o instanceof StringsConfig) {
-            StringsConfig sc = (StringsConfig) o;
+        if (o instanceof StringsConfig sc) {
             return sc.abcd.equals(abcd) &&
-                sc.yes.equals(yes);
+                    sc.yes.equals(yes);
         } else {
             return false;
         }

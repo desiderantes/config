@@ -4,13 +4,8 @@ package beanconfig;
 import java.util.List;
 
 public class EnumsConfig {
-    public enum Problem {
-        P1, P2, P3;
-    };
-    public enum Solution {
-        S1, S2, S3;
-    }
     Problem problem;
+
     List<Solution> solutions;
 
     public Problem getProblem() {
@@ -34,11 +29,9 @@ public class EnumsConfig {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof EnumsConfig)) {
+        if (!(o instanceof EnumsConfig that)) {
             return false;
         }
-
-        EnumsConfig that = (EnumsConfig) o;
 
         if (getProblem() != that.getProblem()) {
             return false;
@@ -56,10 +49,16 @@ public class EnumsConfig {
 
     @Override
     public String toString() {
-        final StringBuffer sb = new StringBuffer("EnumsConfig{");
-        sb.append("problem=").append(problem);
-        sb.append(", solution=").append(solutions);
-        sb.append('}');
-        return sb.toString();
+        return "EnumsConfig{" + "problem=" + problem +
+                ", solution=" + solutions +
+                '}';
+    }
+
+    public enum Problem {
+        P1, P2, P3
+    }
+
+    public enum Solution {
+        S1, S2, S3
     }
 }

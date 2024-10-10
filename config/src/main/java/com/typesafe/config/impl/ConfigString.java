@@ -1,10 +1,7 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
-
-import java.io.ObjectStreamException;
-import java.io.Serializable;
 
 import com.typesafe.config.ConfigOrigin;
 import com.typesafe.config.ConfigRenderOptions;
@@ -12,8 +9,13 @@ import com.typesafe.config.ConfigValueType;
 import com.typesafe.config.parser.ConfigNodeString;
 import com.typesafe.config.parser.ConfigNodeVisitor;
 
-abstract class ConfigString extends AbstractConfigValue implements Serializable, ConfigNodeString{
+import java.io.ObjectStreamException;
+import java.io.Serial;
+import java.io.Serializable;
 
+abstract class ConfigString extends AbstractConfigValue implements Serializable, ConfigNodeString {
+
+    @Serial
     private static final long serialVersionUID = 2L;
 
     final protected String value;
@@ -21,44 +23,6 @@ abstract class ConfigString extends AbstractConfigValue implements Serializable,
     protected ConfigString(ConfigOrigin origin, String value) {
         super(origin);
         this.value = value;
-    }
-
-
-    final static class Quoted extends ConfigString {
-        Quoted(ConfigOrigin origin, String value) {
-            super(origin, value);
-        }
-        @Override
-        protected Quoted newCopy(ConfigOrigin origin) {
-            return new Quoted(origin, value);
-        }
-        // serialization all goes through SerializedConfigValue
-        private Object writeReplace() throws ObjectStreamException {
-            return new SerializedConfigValue(this);
-        }
-    }
-
-    // this is sort of a hack; we want to preserve whether whitespace
-    // was quoted until we process substitutions, so we can ignore
-    // unquoted whitespace when concatenating lists or objects.
-    // We dump this distinction when serializing and deserializing,
-    // but that's OK because it isn't in equals/hashCode, and we
-    // don't allow serializing unresolved objects which is where
-    // quoted-ness matters. If we later make ConfigOrigin point
-    // to the original token range, we could use that to implement
-    // wasQuoted()
-    final static class Unquoted extends ConfigString {
-        Unquoted(ConfigOrigin origin, String value) {
-            super(origin, value);
-        }
-        @Override
-        protected Unquoted newCopy(ConfigOrigin origin) {
-            return new Unquoted(origin, value);
-        }
-        // serialization all goes through SerializedConfigValue
-        private Object writeReplace() throws ObjectStreamException {
-            return new SerializedConfigValue(this);
-        }
     }
 
     boolean wasQuoted() {
@@ -101,6 +65,49 @@ abstract class ConfigString extends AbstractConfigValue implements Serializable,
             else
                 rendered = ConfigImplUtil.renderStringUnquotedIfPossible(value);
             sb.append(rendered);
+        }
+    }
+
+    final static class Quoted extends ConfigString {
+        Quoted(ConfigOrigin origin, String value) {
+            super(origin, value);
+        }
+
+        @Override
+        protected Quoted newCopy(ConfigOrigin origin) {
+            return new Quoted(origin, value);
+        }
+
+        // serialization all goes through SerializedConfigValue
+        @Serial
+        private Object writeReplace() throws ObjectStreamException {
+            return new SerializedConfigValue(this);
+        }
+    }
+
+    // this is sort of a hack; we want to preserve whether whitespace
+    // was quoted until we process substitutions, so we can ignore
+    // unquoted whitespace when concatenating lists or objects.
+    // We dump this distinction when serializing and deserializing,
+    // but that's OK because it isn't in equals/hashCode, and we
+    // don't allow serializing unresolved objects which is where
+    // quoted-ness matters. If we later make ConfigOrigin point
+    // to the original token range, we could use that to implement
+    // wasQuoted()
+    final static class Unquoted extends ConfigString {
+        Unquoted(ConfigOrigin origin, String value) {
+            super(origin, value);
+        }
+
+        @Override
+        protected Unquoted newCopy(ConfigOrigin origin) {
+            return new Unquoted(origin, value);
+        }
+
+        // serialization all goes through SerializedConfigValue
+        @Serial
+        private Object writeReplace() throws ObjectStreamException {
+            return new SerializedConfigValue(this);
         }
     }
 }

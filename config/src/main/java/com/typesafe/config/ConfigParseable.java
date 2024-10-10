@@ -1,5 +1,5 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config;
 
@@ -21,9 +21,8 @@ public interface ConfigParseable {
      * {@link ConfigParseable#options options()} but you could tweak them if you
      * like.
      *
-     * @param options
-     *            parse options, should be based on the ones from
-     *            {@link ConfigParseable#options options()}
+     * @param options parse options, should be based on the ones from
+     *                {@link ConfigParseable#options options()}
      * @return the parsed object
      */
     ConfigObject parse(ConfigParseOptions options);
@@ -31,6 +30,7 @@ public interface ConfigParseable {
     /**
      * Returns a {@link ConfigOrigin} describing the origin of the parseable
      * item.
+     *
      * @return the origin of the parseable item
      */
     ConfigOrigin origin();
@@ -39,6 +39,7 @@ public interface ConfigParseable {
      * Get the initial options, which can be modified then passed to parse().
      * These options will have the right description, includer, and other
      * parameters already set up.
+     *
      * @return the initial options
      */
     ConfigParseOptions options();

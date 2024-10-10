@@ -1,16 +1,18 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
-
-import java.io.ObjectStreamException;
-import java.io.Serializable;
 
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigOrigin;
 
+import java.io.ObjectStreamException;
+import java.io.Serial;
+import java.io.Serializable;
+
 abstract class ConfigNumber extends AbstractConfigValue implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 2L;
 
     // This is so when we concatenate a number into a string (say it appears in
@@ -22,6 +24,24 @@ abstract class ConfigNumber extends AbstractConfigValue implements Serializable 
     protected ConfigNumber(ConfigOrigin origin, String originalText) {
         super(origin);
         this.originalText = originalText;
+    }
+
+    static ConfigNumber newNumber(ConfigOrigin origin, long number,
+                                  String originalText) {
+        if (number <= Integer.MAX_VALUE && number >= Integer.MIN_VALUE)
+            return new ConfigInt(origin, (int) number, originalText);
+        else
+            return new ConfigLong(origin, number, originalText);
+    }
+
+    static ConfigNumber newNumber(ConfigOrigin origin, double number,
+                                  String originalText) {
+        long asLong = (long) number;
+        if (asLong == number) {
+            return newNumber(origin, asLong, originalText);
+        } else {
+            return new ConfigDouble(origin, number, originalText);
+        }
     }
 
     @Override
@@ -58,8 +78,7 @@ abstract class ConfigNumber extends AbstractConfigValue implements Serializable 
     @Override
     public boolean equals(Object other) {
         // note that "origin" is deliberately NOT part of equality
-        if (other instanceof ConfigNumber && canEqual(other)) {
-            ConfigNumber n = (ConfigNumber) other;
+        if (other instanceof ConfigNumber n && canEqual(other)) {
             if (isWhole()) {
                 return n.isWhole() && this.longValue() == n.longValue();
             } else {
@@ -82,28 +101,11 @@ abstract class ConfigNumber extends AbstractConfigValue implements Serializable 
         } else {
             asLong = Double.doubleToLongBits(doubleValue());
         }
-        return (int) (asLong ^ (asLong >>> 32));
-    }
-
-    static ConfigNumber newNumber(ConfigOrigin origin, long number,
-            String originalText) {
-        if (number <= Integer.MAX_VALUE && number >= Integer.MIN_VALUE)
-            return new ConfigInt(origin, (int) number, originalText);
-        else
-            return new ConfigLong(origin, number, originalText);
-    }
-
-    static ConfigNumber newNumber(ConfigOrigin origin, double number,
-            String originalText) {
-        long asLong = (long) number;
-        if (asLong == number) {
-            return newNumber(origin, asLong, originalText);
-        } else {
-            return new ConfigDouble(origin, number, originalText);
-        }
+        return Long.hashCode(asLong);
     }
 
     // serialization all goes through SerializedConfigValue
+    @Serial
     private Object writeReplace() throws ObjectStreamException {
         return new SerializedConfigValue(this);
     }

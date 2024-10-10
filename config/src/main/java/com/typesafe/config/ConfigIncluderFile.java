@@ -1,5 +1,5 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config;
 
@@ -17,10 +17,8 @@ public interface ConfigIncluderFile {
      * not have substitutions resolved. You can throw a ConfigException here to
      * abort parsing, or return an empty object, but may not return null.
      *
-     * @param context
-     *            some info about the include context
-     * @param what
-     *            the include statement's argument
+     * @param context some info about the include context
+     * @param what    the include statement's argument
      * @return a non-null ConfigObject
      */
     ConfigObject includeFile(ConfigIncludeContext context, File what);

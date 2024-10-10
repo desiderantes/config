@@ -1,12 +1,12 @@
 package com.typesafe.config.impl;
 
+import com.typesafe.config.parser.ConfigNode;
+import com.typesafe.config.parser.ConfigNodeVisitor;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-
-import com.typesafe.config.parser.ConfigNode;
-import com.typesafe.config.parser.ConfigNodeVisitor;
 
 final class ConfigNodeInclude extends AbstractConfigNode implements com.typesafe.config.parser.ConfigNodeInclude {
     final private ArrayList<AbstractConfigNode> children;
@@ -14,36 +14,36 @@ final class ConfigNodeInclude extends AbstractConfigNode implements com.typesafe
     final private boolean isRequired;
 
     ConfigNodeInclude(Collection<AbstractConfigNode> children, ConfigIncludeKind kind, boolean isRequired) {
-        this.children = new ArrayList<AbstractConfigNode>(children);
+        this.children = new ArrayList<>(children);
         this.kind = kind;
         this.isRequired = isRequired;
     }
 
-    final public Collection<AbstractConfigNode> children() {
+    public Collection<AbstractConfigNode> children() {
         return children;
     }
 
     @Override
     protected Collection<Token> tokens() {
-        ArrayList<Token> tokens = new ArrayList<Token>();
+        ArrayList<Token> tokens = new ArrayList<>();
         for (AbstractConfigNode child : children) {
             tokens.addAll(child.tokens());
         }
         return tokens;
     }
 
-    protected ConfigIncludeKind kind() {
+    ConfigIncludeKind kind() {
         return kind;
     }
 
-    protected boolean isRequired() {
+    boolean isRequired() {
         return isRequired;
     }
 
-    protected String name() {
+    String name() {
         for (AbstractConfigNode n : children) {
-            if (n instanceof ConfigNodeSimpleValue) {
-                return (String)Tokens.getValue(((ConfigNodeSimpleValue) n).token()).unwrapped();
+            if (n instanceof ConfigNodeSimpleValue cnsv && cnsv.token() instanceof TokenWithOrigin.Value val) {
+                return val.value().unwrapped().toString();
             }
         }
         return null;

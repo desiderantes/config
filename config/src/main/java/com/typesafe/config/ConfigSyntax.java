@@ -1,5 +1,5 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config;
 
@@ -9,7 +9,6 @@ package com.typesafe.config;
  * aka ".conf", or <a href=
  * "http://download.oracle.com/javase/7/docs/api/java/util/Properties.html#load%28java.io.Reader%29"
  * >Java properties</a>).
- * 
  */
 public enum ConfigSyntax {
     /**
@@ -32,5 +31,5 @@ public enum ConfigSyntax {
      * >Java properties</a> format. Associated with the <code>.properties</code>
      * file extension and <code>text/x-java-properties</code> Content-Type.
      */
-    PROPERTIES;
+    PROPERTIES
 }

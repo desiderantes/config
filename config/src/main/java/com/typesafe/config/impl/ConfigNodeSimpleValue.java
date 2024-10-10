@@ -1,10 +1,11 @@
 /**
- *   Copyright (C) 2015 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2015 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
 
 import com.typesafe.config.ConfigException;
-import com.typesafe.config.parser.*;
+import com.typesafe.config.parser.ConfigNode;
+import com.typesafe.config.parser.ConfigNodeVisitor;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -12,8 +13,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 final class ConfigNodeSimpleValue extends AbstractConfigNodeValue {
-    final Token token;
-    ConfigNodeSimpleValue(Token value) {
+    final TokenWithOrigin token;
+
+    ConfigNodeSimpleValue(TokenWithOrigin value) {
         token = value;
     }
 
@@ -22,33 +24,35 @@ final class ConfigNodeSimpleValue extends AbstractConfigNodeValue {
         return Collections.singletonList(token);
     }
 
-    protected Token token() { return token; }
+    protected Token token() {
+        return token;
+    }
 
     protected AbstractConfigValue value() {
-        if (Tokens.isValue(token))
-            return Tokens.getValue(token);
-        else if (Tokens.isUnquotedText(token))
-            return new ConfigString.Unquoted(token.origin(), Tokens.getUnquotedText(token));
-        else if (Tokens.isSubstitution(token)) {
-            List<Token> expression = Tokens.getSubstitutionPathExpression(token);
-            Path path = PathParser.parsePathExpression(expression.iterator(), token.origin());
-            boolean optional = Tokens.getSubstitutionOptional(token);
+        if (token instanceof TokenWithOrigin.Value val) {
+            return val.value();
+        } else if (token instanceof TokenWithOrigin.UnquotedText ut) {
+            return new ConfigString.Unquoted(ut.origin(), ut.value());
+        } else if (token instanceof TokenWithOrigin.Substitution substitution) {
+            List<Token> expression = substitution.value();
+            Path path = PathParser.parsePathExpression(expression.iterator(), substitution.origin());
+            boolean optional = substitution.optional();
 
-            return new ConfigReference(token.origin(), new SubstitutionExpression(path, optional));
+            return new ConfigReference(substitution.origin(), new SubstitutionExpression(path, optional));
         }
         throw new ConfigException.BugOrBroken("ConfigNodeSimpleValue did not contain a valid value token");
     }
 
     @Override
     public <T> T accept(ConfigNodeVisitor<T> visitor) {
-        if (Tokens.isValue(token) || Tokens.isUnquotedText(token))
-            return ((ConfigNode)value()).accept(visitor);
-        else if (Tokens.isSubstitution(token)) {
-            List<Token> expression = Tokens.getSubstitutionPathExpression(token);
-            boolean optional = Tokens.getSubstitutionOptional(token);
+        if (token instanceof TokenWithOrigin.Value || token instanceof TokenWithOrigin.UnquotedText) {
+            return ((ConfigNode) value()).accept(visitor);
+        } else if (token instanceof TokenWithOrigin.Substitution substitution) {
+            List<Token> expression = substitution.value();
+            boolean optional = substitution.optional();
 
-            return visitor.visitReference(new ConfigNodeReference(token.origin(),
-                    Collections.unmodifiableList(expression.stream().map(x -> new ConfigNodeSingleToken(x)).collect(Collectors.toList())),
+            return visitor.visitReference(new ConfigNodeReference(substitution.origin(),
+                    Collections.unmodifiableList(expression.stream().map(ConfigNodeSingleToken::new).collect(Collectors.toList())),
                     optional));
         }
         throw new ConfigException.BugOrBroken("ConfigNodeSimpleValue did not contain a valid value token");

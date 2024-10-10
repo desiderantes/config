@@ -1,26 +1,18 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
-
-import java.io.IOException;
-import java.io.Reader;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
 
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigOrigin;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.util.*;
+
 final class PropertiesParser {
     static AbstractConfigObject parse(Reader reader,
-            ConfigOrigin origin) throws IOException {
+                                      ConfigOrigin origin) throws IOException {
         Properties props = new Properties();
         props.load(reader);
         return fromProperties(origin, props);
@@ -55,7 +47,7 @@ final class PropertiesParser {
     }
 
     static AbstractConfigObject fromProperties(ConfigOrigin origin,
-            Properties props) {
+                                               Properties props) {
         return fromEntrySet(origin, props.entrySet());
     }
 
@@ -65,7 +57,7 @@ final class PropertiesParser {
     }
 
     private static <K, V> Map<Path, Object> getPathMap(Set<Map.Entry<K, V>> entries) {
-        Map<Path, Object> pathMap = new HashMap<Path, Object>();
+        Map<Path, Object> pathMap = new HashMap<>();
         for (Map.Entry<K, V> entry : entries) {
             Object key = entry.getKey();
             if (key instanceof String) {
@@ -81,8 +73,8 @@ final class PropertiesParser {
     }
 
     static AbstractConfigObject fromPathMap(ConfigOrigin origin,
-            Map<?, ?> pathExpressionMap) {
-        Map<Path, Object> pathMap = new HashMap<Path, Object>();
+                                            Map<?, ?> pathExpressionMap) {
+        Map<Path, Object> pathMap = new HashMap<>();
         for (Map.Entry<?, ?> entry : pathExpressionMap.entrySet()) {
             Object keyObj = entry.getKey();
             if (!(keyObj instanceof String)) {
@@ -96,13 +88,13 @@ final class PropertiesParser {
     }
 
     private static AbstractConfigObject fromPathMap(ConfigOrigin origin,
-            Map<Path, Object> pathMap, boolean convertedFromProperties) {
+                                                    Map<Path, Object> pathMap, boolean convertedFromProperties) {
         /*
          * First, build a list of paths that will have values, either string or
          * object values.
          */
-        Set<Path> scopePaths = new HashSet<Path>();
-        Set<Path> valuePaths = new HashSet<Path>();
+        Set<Path> scopePaths = new HashSet<>();
+        Set<Path> valuePaths = new HashSet<>();
         for (Path path : pathMap.keySet()) {
             // add value's path
             valuePaths.add(path);
@@ -137,11 +129,11 @@ final class PropertiesParser {
         /*
          * Create maps for the object-valued values.
          */
-        Map<String, AbstractConfigValue> root = new HashMap<String, AbstractConfigValue>();
-        Map<Path, Map<String, AbstractConfigValue>> scopes = new HashMap<Path, Map<String, AbstractConfigValue>>();
+        Map<String, AbstractConfigValue> root = new HashMap<>();
+        Map<Path, Map<String, AbstractConfigValue>> scopes = new HashMap<>();
 
         for (Path path : scopePaths) {
-            Map<String, AbstractConfigValue> scope = new HashMap<String, AbstractConfigValue>();
+            Map<String, AbstractConfigValue> scope = new HashMap<>();
             scopes.put(path, scope);
         }
 
@@ -173,17 +165,13 @@ final class PropertiesParser {
          * Make a list of scope paths from longest to shortest, so children go
          * before parents.
          */
-        List<Path> sortedScopePaths = new ArrayList<Path>();
-        sortedScopePaths.addAll(scopePaths);
+        List<Path> sortedScopePaths = new ArrayList<>(scopePaths);
         // sort descending by length
-        Collections.sort(sortedScopePaths, new Comparator<Path>() {
-            @Override
-            public int compare(Path a, Path b) {
-                // Path.length() is O(n) so in theory this sucks
-                // but in practice we can make Path precompute length
-                // if it ever matters.
-                return b.length() - a.length();
-            }
+        sortedScopePaths.sort((a, b) -> {
+            // Path.length() is O(n) so in theory this sucks
+            // but in practice we can make Path precompute length
+            // if it ever matters.
+            return b.length() - a.length();
         });
 
         /*

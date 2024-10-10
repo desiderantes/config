@@ -2,10 +2,6 @@ package beanconfig;
 
 public class NotABeanFieldConfig {
 
-    public static class NotABean {
-        int stuff;
-    }
-
     private NotABean notBean;
 
     public NotABean getNotBean() {
@@ -14,5 +10,9 @@ public class NotABeanFieldConfig {
 
     public void setNotBean(NotABean notBean) {
         this.notBean = notBean;
+    }
+
+    public static class NotABean {
+        int stuff;
     }
 }

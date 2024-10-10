@@ -1,11 +1,11 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
 
-import java.util.Stack;
-
 import com.typesafe.config.ConfigException;
+
+import java.util.Stack;
 
 final class PathBuilder {
     // the keys are kept "backward" (top of stack is end of path)
@@ -13,7 +13,7 @@ final class PathBuilder {
     private Path result;
 
     PathBuilder() {
-        keys = new Stack<String>();
+        keys = new Stack<>();
     }
 
     private void checkCanAppend() {

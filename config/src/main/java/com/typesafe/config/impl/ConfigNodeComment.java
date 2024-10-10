@@ -4,15 +4,15 @@ import com.typesafe.config.ConfigException;
 import com.typesafe.config.parser.ConfigNodeVisitor;
 
 final class ConfigNodeComment extends ConfigNodeSingleToken implements com.typesafe.config.parser.ConfigNodeComment {
-    ConfigNodeComment(Token comment) {
+    ConfigNodeComment(TokenWithOrigin.Comment comment) {
         super(comment);
-        if (!Tokens.isComment(super.token)) {
+        if (!(super.token instanceof TokenWithOrigin.Comment)) {
             throw new ConfigException.BugOrBroken("Tried to create a ConfigNodeComment from a non-comment token");
         }
     }
 
-    protected String commentText() {
-        return Tokens.getCommentText(super.token);
+    String commentText() {
+        return ((TokenWithOrigin.Comment) token).text();
     }
 
     @Override

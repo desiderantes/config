@@ -1,14 +1,14 @@
 /**
- *   Copyright (C) 2015 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2015 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config.impl;
-
-import java.util.Collection;
-import java.util.Collections;
 
 import com.typesafe.config.parser.ConfigNode;
 import com.typesafe.config.parser.ConfigNodeSyntax;
 import com.typesafe.config.parser.ConfigNodeVisitor;
+
+import java.util.Collection;
+import java.util.Collections;
 
 class ConfigNodeSingleToken extends AbstractConfigNode implements ConfigNodeSyntax {
     final Token token;
@@ -41,8 +41,8 @@ class ConfigNodeSingleToken extends AbstractConfigNode implements ConfigNodeSynt
 
     @Override
     public ConfigNode getAnyValue() {
-        if (Tokens.isValue(token))
-            return (ConfigNode) Tokens.getValue(token);
+        if (token instanceof TokenWithOrigin.Value val)
+            return (ConfigNode) val.value();
         else
             return null;
     }

@@ -1,12 +1,12 @@
 package beanconfig;
 
-import java.util.List;
-import java.time.Duration;
-
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigMemorySize;
 import com.typesafe.config.ConfigObject;
 import com.typesafe.config.ConfigValue;
+
+import java.time.Duration;
+import java.util.List;
 
 public class ArraysConfig {
 

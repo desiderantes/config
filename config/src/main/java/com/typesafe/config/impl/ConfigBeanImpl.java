@@ -1,30 +1,15 @@
 package com.typesafe.config.impl;
 
+import com.typesafe.config.Optional;
+import com.typesafe.config.*;
+
 import java.beans.BeanInfo;
 import java.beans.IntrospectionException;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.lang.reflect.*;
 import java.time.Duration;
-import java.util.Set;
-
-import com.typesafe.config.Config;
-import com.typesafe.config.ConfigObject;
-import com.typesafe.config.ConfigList;
-import com.typesafe.config.ConfigException;
-import com.typesafe.config.ConfigMemorySize;
-import com.typesafe.config.ConfigValue;
-import com.typesafe.config.ConfigValueType;
-import com.typesafe.config.Optional;
+import java.util.*;
 
 /**
  * Internal implementation detail, not ABI stable, do not touch.
@@ -35,18 +20,19 @@ public class ConfigBeanImpl {
     /**
      * This is public ONLY for use by the "config" package, DO NOT USE this ABI
      * may change.
-     * @param <T> type of the bean
+     *
+     * @param <T>    type of the bean
      * @param config config to use
-     * @param clazz class of the bean
+     * @param clazz  class of the bean
      * @return the bean instance
      */
     public static <T> T createInternal(Config config, Class<T> clazz) {
-        if (((SimpleConfig)config).root().resolveStatus() != ResolveStatus.RESOLVED)
+        if (((SimpleConfig) config).root().resolveStatus() != ResolveStatus.RESOLVED)
             throw new ConfigException.NotResolved(
                     "need to Config#resolve() a config before using it to initialize a bean, see the API docs for Config#resolve()");
 
-        Map<String, AbstractConfigValue> configProps = new HashMap<String, AbstractConfigValue>();
-        Map<String, String> originalNames = new HashMap<String, String>();
+        Map<String, AbstractConfigValue> configProps = new HashMap<>();
+        Map<String, String> originalNames = new HashMap<>();
         for (Map.Entry<String, ConfigValue> configProp : config.root().entrySet()) {
             String originalName = configProp.getKey();
             String camelName = ConfigImplUtil.toCamelCase(originalName);
@@ -69,7 +55,7 @@ public class ConfigBeanImpl {
         }
 
         try {
-            List<PropertyDescriptor> beanProps = new ArrayList<PropertyDescriptor>();
+            List<PropertyDescriptor> beanProps = new ArrayList<>();
             for (PropertyDescriptor beanProp : beanInfo.getPropertyDescriptors()) {
                 if (beanProp.getReadMethod() == null || beanProp.getWriteMethod() == null) {
                     continue;
@@ -79,7 +65,7 @@ public class ConfigBeanImpl {
 
             // Try to throw all validation issues at once (this does not comprehensively
             // find every issue, but it should find common ones).
-            List<ConfigException.ValidationProblem> problems = new ArrayList<ConfigException.ValidationProblem>();
+            List<ConfigException.ValidationProblem> problems = new ArrayList<>();
             for (PropertyDescriptor beanProp : beanProps) {
                 Method setter = beanProp.getWriteMethod();
                 Class<?> parameterClass = setter.getParameterTypes()[0];
@@ -145,7 +131,7 @@ public class ConfigBeanImpl {
     // types plus you can always use Object, ConfigValue, Config,
     // ConfigObject, etc.  as an escape hatch.
     private static Object getValue(Class<?> beanClass, Type parameterType, Class<?> parameterClass, Config config,
-            String configPropName) {
+                                   String configPropName) {
         if (parameterClass == Boolean.class || parameterClass == boolean.class) {
             return config.getBoolean(configPropName);
         } else if (parameterClass == Integer.class || parameterClass == int.class) {
@@ -168,7 +154,7 @@ public class ConfigBeanImpl {
             return getSetValue(beanClass, parameterType, parameterClass, config, configPropName);
         } else if (parameterClass == Map.class) {
             // we could do better here, but right now we don't.
-            Type[] typeArgs = ((ParameterizedType)parameterType).getActualTypeArguments();
+            Type[] typeArgs = ((ParameterizedType) parameterType).getActualTypeArguments();
             if (typeArgs[0] != String.class || typeArgs[1] != Object.class) {
                 throw new ConfigException.BadBean("Bean property '" + configPropName + "' of class " + beanClass.getName() + " has unsupported Map<" + typeArgs[0] + "," + typeArgs[1] + ">, only Map<String,Object> is supported right now");
             }
@@ -183,7 +169,7 @@ public class ConfigBeanImpl {
             return config.getList(configPropName);
         } else if (parameterClass.isEnum()) {
             @SuppressWarnings("unchecked")
-            Enum enumValue = config.getEnum((Class<Enum>) parameterClass, configPropName);
+            var enumValue = config.getEnum((Class<Enum>) parameterClass, configPropName);
             return enumValue;
         } else if (hasAtLeastOneBeanProperty(parameterClass)) {
             return createInternal(config.getConfig(configPropName), parameterClass);
@@ -197,7 +183,7 @@ public class ConfigBeanImpl {
     }
 
     private static Object getListValue(Class<?> beanClass, Type parameterType, Class<?> parameterClass, Config config, String configPropName) {
-        Type elementType = ((ParameterizedType)parameterType).getActualTypeArguments()[0];
+        Type elementType = ((ParameterizedType) parameterType).getActualTypeArguments()[0];
 
         if (elementType == Boolean.class) {
             return config.getBooleanList(configPropName);
@@ -226,7 +212,7 @@ public class ConfigBeanImpl {
             List<Enum> enumValues = config.getEnumList((Class<Enum>) elementType, configPropName);
             return enumValues;
         } else if (hasAtLeastOneBeanProperty((Class<?>) elementType)) {
-            List<Object> beanList = new ArrayList<Object>();
+            List<Object> beanList = new ArrayList<>();
             List<? extends Config> configList = config.getConfigList(configPropName);
             for (Config listMember : configList) {
                 beanList.add(createInternal(listMember, (Class<?>) elementType));
@@ -269,7 +255,7 @@ public class ConfigBeanImpl {
     }
 
     private static boolean hasAtLeastOneBeanProperty(Class<?> clazz) {
-        BeanInfo beanInfo = null;
+        BeanInfo beanInfo;
         try {
             beanInfo = Introspector.getBeanInfo(clazz);
         } catch (IntrospectionException e) {
@@ -288,6 +274,11 @@ public class ConfigBeanImpl {
     private static boolean isOptionalProperty(Class beanClass, PropertyDescriptor beanProp) {
         Field field = getField(beanClass, beanProp.getName());
         return field != null ? field.getAnnotationsByType(Optional.class).length > 0 : beanProp.getReadMethod().getAnnotationsByType(Optional.class).length > 0;
+    }
+
+    private static boolean isOptionalTypeProperty(Class beanClass, PropertyDescriptor beanProp) {
+        Field field = getField(beanClass, beanProp.getName());
+        return field.getType().isAssignableFrom(java.util.Optional.class);
     }
 
     private static Field getField(Class beanClass, String fieldName) {

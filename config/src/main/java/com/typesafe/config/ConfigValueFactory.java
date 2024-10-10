@@ -1,11 +1,11 @@
 /**
- *   Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
+ * Copyright (C) 2011-2012 Typesafe Inc. <http://typesafe.com>
  */
 package com.typesafe.config;
 
-import java.util.Map;
-
 import com.typesafe.config.impl.ConfigImpl;
+
+import java.util.Map;
 
 /**
  * This class holds some static factory methods for building {@link ConfigValue}
@@ -28,21 +28,21 @@ public final class ConfigValueFactory {
      * {@link ConfigList}. If the <code>Iterable</code> is not an ordered
      * collection, results could be strange, since <code>ConfigList</code> is
      * ordered.
-     * 
+     *
      * <p>
      * In a <code>Map</code> passed to <code>fromAnyRef()</code>, the map's keys
      * are plain keys, not path expressions. So if your <code>Map</code> has a
      * key "foo.bar" then you will get one object with a key called "foo.bar",
      * rather than an object with a key "foo" containing another object with a
      * key "bar".
-     * 
+     *
      * <p>
      * The originDescription will be used to set the origin() field on the
      * ConfigValue. It should normally be the name of the file the values came
      * from, or something short describing the value such as "default settings".
      * The originDescription is prefixed to error messages so users can tell
      * where problematic values are coming from.
-     * 
+     *
      * <p>
      * Supplying the result of ConfigValue.unwrapped() to this function is
      * guaranteed to work and should give you back a ConfigValue that matches
@@ -61,11 +61,9 @@ public final class ConfigValueFactory {
      * ConfigValue, but supplying such a value is a bug in your program, so you
      * should never handle the exception. Just fix your program (or report a bug
      * against this library).
-     * 
-     * @param object
-     *            object to convert to ConfigValue
-     * @param originDescription
-     *            name of origin file or brief description of what the value is
+     *
+     * @param object            object to convert to ConfigValue
+     * @param originDescription name of origin file or brief description of what the value is
      * @return a new value
      */
     public static ConfigValue fromAnyRef(Object object, String originDescription) {
@@ -73,10 +71,10 @@ public final class ConfigValueFactory {
     }
 
     /**
-     * See the {@link #fromAnyRef(Object,String)} documentation for details.
+     * See the {@link #fromAnyRef(Object, String)} documentation for details.
      * This is a typesafe wrapper that only works on {@link java.util.Map} and
      * returns {@link ConfigObject} rather than {@link ConfigValue}.
-     * 
+     *
      * <p>
      * If your <code>Map</code> has a key "foo.bar" then you will get one object
      * with a key called "foo.bar", rather than an object with a key "foo"
@@ -86,36 +84,36 @@ public final class ConfigValueFactory {
      * modified, and the values are wrapped in ConfigValue. To get nested
      * {@code ConfigObject}, some of the values in the map would have to be more
      * maps.
-     * 
+     *
      * <p>
-     * See also {@link ConfigFactory#parseMap(Map,String)} which interprets the
+     * See also {@link ConfigFactory#parseMap(Map, String)} which interprets the
      * keys in the map as path expressions.
-     * 
-     * @param values map from keys to plain Java values
+     *
+     * @param values            map from keys to plain Java values
      * @param originDescription description to use in {@link ConfigOrigin} of created values
      * @return a new {@link ConfigObject} value
      */
     public static ConfigObject fromMap(Map<String, ? extends Object> values,
-            String originDescription) {
+                                       String originDescription) {
         return (ConfigObject) fromAnyRef(values, originDescription);
     }
 
     /**
-     * See the {@link #fromAnyRef(Object,String)} documentation for details.
+     * See the {@link #fromAnyRef(Object, String)} documentation for details.
      * This is a typesafe wrapper that only works on {@link java.lang.Iterable}
      * and returns {@link ConfigList} rather than {@link ConfigValue}.
      *
-     * @param values list of plain Java values
+     * @param values            list of plain Java values
      * @param originDescription description to use in {@link ConfigOrigin} of created values
      * @return a new {@link ConfigList} value
      */
     public static ConfigList fromIterable(Iterable<? extends Object> values,
-            String originDescription) {
+                                          String originDescription) {
         return (ConfigList) fromAnyRef(values, originDescription);
     }
 
     /**
-     * See the other overload {@link #fromAnyRef(Object,String)} for details,
+     * See the other overload {@link #fromAnyRef(Object, String)} for details,
      * this one just uses a default origin description.
      *
      * @param object a plain Java value
@@ -126,7 +124,7 @@ public final class ConfigValueFactory {
     }
 
     /**
-     * See the other overload {@link #fromMap(Map,String)} for details, this one
+     * See the other overload {@link #fromMap(Map, String)} for details, this one
      * just uses a default origin description.
      *
      * <p>
